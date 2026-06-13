@@ -260,6 +260,28 @@ def find_subagent_files(session_id, projects_dir=None):
         _projects_dir(projects_dir), "*", session_id, "subagents", "agent-*.jsonl")))
 
 
+def find_subagent_meta(session_id, projects_dir=None):
+    """Read the `agent-*.meta.json` sidecars next to sub-agent transcripts.
+
+    Same glob as find_subagent_files but `*.meta.json`. Each sidecar carries
+    {agentType, description, toolUseId}, where `toolUseId` matches a
+    subagent.start spanId with the `span-` prefix stripped — a deterministic
+    bridge from a telemetry span to its transcript and task description.
+    Returns a list of {agentType, description, toolUseId} (utf-8, robust to a
+    broken/missing file)."""
+    out = []
+    for fp in sorted(glob.glob(os.path.join(
+            _projects_dir(projects_dir), "*", session_id, "subagents",
+            "agent-*.meta.json"))):
+        meta = read_json(fp, None)
+        if not isinstance(meta, dict):
+            continue
+        out.append({"agentType": meta.get("agentType"),
+                    "description": meta.get("description"),
+                    "toolUseId": meta.get("toolUseId")})
+    return out
+
+
 def _ts_to_epoch(ts):
     """Parse an ISO-8601 timestamp (with optional 'Z'/fractional) to epoch secs."""
     if not ts:
@@ -367,6 +389,153 @@ def parse_transcript_messages(path):
             if text:
                 out.append({"ts": ts, "text": text})
     return out
+
+
+# Per-tool "key argument" field for the lazy actions list, mirroring the hook's
+# _TRACE_ARG_FIELD plus Task (sub-task description). MCP args are handled
+# separately (no single canonical field), see _action_arg.
+_ACTION_ARG_FIELD = {
+    "Bash": "command",
+    "Read": "file_path",
+    "Edit": "file_path",
+    "Write": "file_path",
+    "MultiEdit": "file_path",
+    "NotebookEdit": "file_path",
+    "Grep": "pattern",
+    "Glob": "pattern",
+    "Task": "description",
+    "Agent": "description",
+}
+
+
+def _split_mcp_name(name):
+    """Split `mcp__<server>__<tool>` into (server, tool). The server<->tool
+    delimiter is always `__`; the server name may contain single underscores.
+    Defensive: no delimiter after the prefix -> ("", rest)."""
+    body = name[len("mcp__"):]
+    server, sep, tool = body.partition("__")
+    if not sep:
+        return "", body
+    return server, tool
+
+
+def _action_type(name):
+    if isinstance(name, str) and name.startswith("mcp__"):
+        return "mcp"
+    if name == "Bash":
+        return "bash"
+    if name in ("Task", "Agent"):
+        return "subtask"
+    return "tool"
+
+
+def _action_arg(name, tool_input):
+    """Key argument/digest for one tool_use, trimmed to 200. Never raises on a
+    non-dict input."""
+    if not isinstance(tool_input, dict):
+        return ""
+    if isinstance(name, str) and name.startswith("mcp__"):
+        for v in tool_input.values():
+            if isinstance(v, str) and v:
+                return v[:200]
+        return ""
+    field = _ACTION_ARG_FIELD.get(name)
+    if not field:
+        return ""
+    val = tool_input.get(field)
+    if not isinstance(val, str):
+        return ""
+    return val[:200]
+
+
+def parse_transcript_actions(path):
+    """Collect one agent's tool actions from its transcript (lazy, on expand).
+
+    Reads `type=="assistant"` content blocks of type `tool_use`
+    (name/id/input/timestamp) and `type=="user"` blocks of type `tool_result`
+    (tool_use_id/is_error) to derive a per-call status. Every tool_use in a
+    sub-agent transcript belongs to that agent, so attribution is exact (unlike
+    the best-effort live-feed lane). UTF-8, robust to broken lines; this is the
+    lazy/post-mortem path and is never called on the hot feed path.
+
+    Returns {actions, counts}:
+        actions: chronological list (ascending ts) of
+            {type, name, arg, status, ts, relMs}
+          - type:  "tool"|"bash"|"mcp"|"subtask"|"hook"
+          - name:  "<server> · <tool>" for mcp; the tool name otherwise
+          - arg:   key argument/digest (Bash->command, Read/Edit/Write->file_path,
+                   Grep/Glob->pattern, mcp->first string input, Task->description),
+                   trimmed to 200; "" when absent
+          - status:"ok"|"error"|"running" (running = no matching tool_result)
+          - ts:    iso8601 or None; relMs: ms from the first action (0 for first)
+        counts: {tool, bash, mcp, subtask, hook}
+    """
+    calls = []           # collected tool_use entries (file order)
+    results = {}         # tool_use_id -> is_error (bool)
+    for line in _iter_lines(path):
+        try:
+            e = json.loads(line)
+        except ValueError:
+            continue
+        etype = e.get("type")
+        if etype not in ("assistant", "user"):
+            continue
+        msg = e.get("message") or {}
+        content = msg.get("content")
+        if not isinstance(content, list):
+            continue
+        ts = e.get("timestamp")
+        for block in content:
+            if not isinstance(block, dict):
+                continue
+            btype = block.get("type")
+            if etype == "assistant" and btype == "tool_use":
+                name = block.get("name")
+                calls.append({
+                    "id": block.get("id"),
+                    "type": _action_type(name),
+                    "name": name,
+                    "input": block.get("input"),
+                    "ts": ts,
+                })
+            elif etype == "user" and btype == "tool_result":
+                tuid = block.get("tool_use_id")
+                if tuid is not None:
+                    results[tuid] = bool(block.get("is_error"))
+
+    epochs = [e for e in (_ts_to_epoch(c.get("ts")) for c in calls)
+              if e is not None]
+    base = min(epochs) if epochs else None
+
+    counts = {"tool": 0, "bash": 0, "mcp": 0, "subtask": 0, "hook": 0}
+    actions = []
+    for c in calls:
+        cid = c.get("id")
+        if cid in results:
+            status = "error" if results[cid] else "ok"
+        else:
+            status = "running"
+        atype = c.get("type")
+        name = c.get("name")
+        if atype == "mcp" and isinstance(name, str):
+            server, tool = _split_mcp_name(name)
+            display = f"{server} · {tool}"
+        else:
+            display = name
+        e0 = _ts_to_epoch(c.get("ts"))
+        rel = (max(0, int(round((e0 - base) * 1000)))
+               if (e0 is not None and base is not None) else None)
+        if atype in counts:
+            counts[atype] += 1
+        actions.append({
+            "type": atype, "name": display,
+            "arg": _action_arg(name, c.get("input")),
+            "status": status, "ts": c.get("ts"), "relMs": rel,
+        })
+
+    # Sort chronologically (variant B); fall back to file order for unknown ts.
+    actions.sort(key=lambda a: a["relMs"] if a["relMs"] is not None else 0)
+    return {"actions": actions, "counts": counts}
 
 
 def _iter_lines(path):
@@ -499,6 +668,9 @@ def build_feed(root, slug, since_offset=0):
         }
         if kind == "tool.start":
             rec["arg"] = e.get("arg")
+            for k in ("kind", "server", "mcpTool"):
+                if k in e:
+                    rec[k] = e.get(k)
         else:
             rec["ok"] = e.get("ok", True)
         events.append(rec)
@@ -564,9 +736,12 @@ def build_trace(root, slug, window=CONTEXT_WINDOW, projects_dir=None):
         main = find_main_transcript(sid, projects_dir)
         if main:
             mu = parse_transcript_usage(main)
+            # The orchestrator has no task description of its own (q5=A): give it
+            # a deterministic auto-caption so the front-end can show a label.
             agents.append(_agent_record(
                 spanId="orch-" + sid, role="оркестратор", session_id=sid,
-                kind="orchestrator", usage=mu, window=window))
+                kind="orchestrator", usage=mu, window=window,
+                summary="оркестратор сессии"))
 
         sess_epochs = [e for s in sess_spans
                        for e in (_ts_to_epoch(s.get("startTs")), _ts_to_epoch(s.get("endTs")))
@@ -603,10 +778,11 @@ def build_trace(root, slug, window=CONTEXT_WINDOW, projects_dir=None):
 
 def _agent_record(spanId, role, session_id, kind, usage, window,
                   workstream=None, phase=None, bg=None, ok=True,
-                  startTs=None, endTs=None):
+                  startTs=None, endTs=None, summary=None):
     peak = usage.get("peakContext") if usage else None
     return {
         "spanId": spanId, "role": role, "session_id": session_id, "kind": kind,
+        "summary": summary,
         "workstream": workstream, "phase": phase, "bg": bg, "ok": ok,
         "startTs": startTs or (usage.get("firstTs") if usage else None),
         "endTs": endTs or (usage.get("lastTs") if usage else None),
@@ -654,7 +830,8 @@ def _join_spans_transcripts(spans, parsed, sid, window=CONTEXT_WINDOW):
             spanId=sp.get("spanId"), role=role or (u or {}).get("role") or "subagent",
             session_id=sid, kind="subagent", usage=u, window=window,
             workstream=sp.get("workstream"), phase=sp.get("phase"), bg=sp.get("bg"),
-            ok=sp.get("ok", True), startTs=sp.get("startTs"), endTs=sp.get("endTs")))
+            ok=sp.get("ok", True), startTs=sp.get("startTs"), endTs=sp.get("endTs"),
+            summary=sp.get("summary")))
 
     # 3) leftover transcripts with no span (e.g. built-in agents) -> zip in
     for i, p in enumerate(pool):

@@ -96,6 +96,10 @@
   .question.answered { border-color: var(--ok); }
   .q-text { font-weight: 600; margin-bottom: 8px; }
   .opt { display: block; padding: 4px 0; cursor: pointer; }
+  /* own free-form answer under choice options + per-variant comment label */
+  .own-answer { margin-top: 8px; border-top: 1px dashed var(--line); padding-top: 10px; }
+  .own-lbl { font-size: 12px; color: var(--muted); margin-bottom: 5px; display: block; }
+  .own-answer textarea { min-height: 40px; }
 
   /* visual-demo variants */
   .demo-intro { margin-bottom: 12px; }
@@ -108,8 +112,14 @@
   .variant-head .v-title { font-weight: 600; flex: 1; }
   .variant-head .open { font-size: 12px; color: var(--accent); text-decoration: none; white-space: nowrap; }
   iframe.mock { display: block; width: 100%; height: 420px; border: none; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: #fff; }
-  .variant .region { padding: 10px 12px; }
-  .variant .region.has-draft { border-left: none; padding-left: 12px; }
+  .v-body { padding: 10px 12px; }
+  .v-body .region { padding: 0; }
+  .v-body .region.has-draft { border-left: none; padding-left: 0; }
+  .v-body .region .md { margin-bottom: 10px; }
+  .v-comment { margin-top: 4px; }
+  .v-comment textarea { min-height: 40px; }
+  .v-comment-row { display: flex; justify-content: flex-end; margin-top: 6px; }
+  .v-comment-send { padding: 6px 12px; font-size: 13px; }
 
   .ws { display: flex; align-items: center; gap: 10px; padding: 8px 4px; border-bottom: 1px solid var(--line); }
   .ws:last-child { border-bottom: none; }
@@ -207,6 +217,48 @@
   .feed-msg { padding: 6px 0 6px 8px; border-left: 2px solid var(--line); margin: 6px 0; font-size: 13px; line-height: 1.55; }
   .feed-msg .feed-t { display: block; margin-bottom: 2px; }
   .feed-empty { font-size: 13px; color: var(--muted); padding: 4px 14px 12px; }
+
+  /* action-type colours (live feed rows + post-mortem card timeline) */
+  :root { --t-tool: #10b981; --t-bash: #d97706; --t-mcp: #ec4899; --t-hook: #0ea5e9; --t-subtask: #8b5cf6; }
+  .feed-row.mcp::before { background: var(--t-mcp); }
+  .feed-row.bash::before { background: var(--t-bash); }
+  .feed-row.tool::before { background: var(--t-tool); }
+  .feed-row.mcp.running::before, .feed-row.bash.running::before, .feed-row.tool.running::before { background: var(--accent); }
+  .feed-row.err::before { background: #ef4444; }
+  .feed-tool.mcp { color: var(--t-mcp); } .feed-tool.bash { color: var(--t-bash); } .feed-tool.tool { color: var(--t-tool); }
+
+  /* trace tab: expandable post-mortem agent card (description + actions + messages) */
+  .agent.open .agent-caret { transform: rotate(90deg); }
+  .agent-caret { color: var(--accent); font-size: 12px; transition: transform .15s; display: inline-block; }
+  .agent-head.clickable { cursor: pointer; }
+  .agent-desc { flex-basis: 100%; font-size: 13px; color: var(--ink); margin-top: 2px; }
+  .agent-desc .lbl { color: var(--muted); }
+  .agent-body { display: none; border-top: 1px dashed var(--line); margin-top: 10px; padding-top: 10px; }
+  .agent.open .agent-body { display: block; }
+  .card-sub { margin: 6px 0; }
+  .card-subbtn { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; border: 1px dashed var(--line); border-radius: 9px; background: var(--accent-soft); padding: 6px 10px; font-size: 13px; font-weight: 600; }
+  .card-subcaret { color: var(--accent); font-size: 12px; display: inline-block; transition: transform .15s; }
+  .card-subbtn.open .card-subcaret { transform: rotate(90deg); }
+  .legend { display: flex; flex-wrap: wrap; gap: 7px; margin: 8px 0 4px; }
+  .lchip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: var(--chip); color: var(--muted); }
+  .lchip .ldot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+  .act-timeline { position: relative; padding: 6px 0 2px 4px; }
+  .act-timeline::before { content: ""; position: absolute; left: 12px; top: 8px; bottom: 8px; width: 2px; background: var(--line); }
+  .act-row { position: relative; display: flex; align-items: center; gap: 8px; padding: 5px 0 5px 30px; }
+  .act-row::before { content: ""; position: absolute; left: 8px; top: 12px; width: 9px; height: 9px; border-radius: 50%; border: 2px solid var(--panel); background: var(--line); }
+  .act-row.tool::before { background: var(--t-tool); } .act-row.bash::before { background: var(--t-bash); }
+  .act-row.mcp::before { background: var(--t-mcp); } .act-row.hook::before { background: var(--t-hook); }
+  .act-row.subtask::before { background: var(--t-subtask); }
+  .act-row.running::before { background: var(--accent); } .act-row.err::before { box-shadow: 0 0 0 2px #ef4444; }
+  .act-type { font: 10px ui-monospace, monospace; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; padding: 1px 7px; border-radius: 5px; color: #fff; flex: none; }
+  .act-row.tool .act-type { background: var(--t-tool); } .act-row.bash .act-type { background: var(--t-bash); }
+  .act-row.mcp .act-type { background: var(--t-mcp); } .act-row.hook .act-type { background: var(--t-hook); }
+  .act-row.subtask .act-type { background: var(--t-subtask); }
+  .act-t { font: 11px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted); min-width: 44px; flex: none; }
+  .act-name { font: 11px ui-monospace, monospace; font-weight: 700; color: var(--ink); flex: none; }
+  .act-arg { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted); word-break: break-all; }
+  .act-status { margin-left: auto; flex: none; }
+  .act-more { font-size: 12px; color: var(--accent); cursor: pointer; padding: 6px 0 2px 30px; }
 
   /* changes tab: compact file tree (left) + diff with line-number gutter (right) — design v2 */
   /* warm "github-light" token palette for diff syntax highlighting */
@@ -658,8 +710,14 @@ function render(data, replies){
       const reps = repliesByQ[item.id] || [];
       let input;
       if(item.kind === "choice" && (item.options||[]).length){
-        input = item.options.map(o =>
+        // an answer whose text matches no option is the human's own free-form reply
+        const ownText = (ans && !item.options.includes(ans.text)) ? ans.text : "";
+        const opts = item.options.map(o =>
           `<label class="opt"><input type="radio" name="q-${esc(item.id)}" value="${esc(o)}" ${ans&&ans.text===o?"checked":""}> ${esc(o)}</label>`).join("");
+        input = opts + `<div class="own-answer">
+          <span class="own-lbl">Или свой ответ:</span>
+          <textarea data-answer="${esc(item.id)}" placeholder="Свой вариант ответа…">${esc(ownText)}</textarea>
+        </div>`;
       } else {
         input = `<textarea data-answer="${esc(item.id)}" placeholder="Ваш ответ…">${esc(ans?ans.text:"")}</textarea>`;
       }
@@ -713,7 +771,13 @@ function renderDemo(demo, repliesByBlock){
   for(const vr of (demo.variants||[])){
     const sel = vr.id === chosen;
     const url = `/mockup?slug=${encodeURIComponent(SLUG)}&file=${encodeURIComponent(vr.file||"")}`;
-    const cap = vr.caption ? region(vr.id, md(vr.caption), repliesByBlock) : "";
+    // caption (when present) stays select-to-commentable, but footer is rendered once below
+    const cap = vr.caption ? `<div class="region" data-anchor="${esc(vr.id)}"><div class="md">${md(vr.caption)}</div></div>` : "";
+    const comment = `<div class="v-comment">
+        <span class="own-lbl">💬 Комментарий к этому варианту:</span>
+        <textarea data-comment-variant="${esc(vr.id)}" placeholder="Поправить именно этот вариант…"></textarea>
+        <div class="v-comment-row"><button class="ghost v-comment-send" data-comment-variant="${esc(vr.id)}">Отправить</button></div>
+      </div>`;
     v += `<div class="variant ${sel?'sel':''}" data-variant="${esc(vr.id)}">
       <label class="variant-head">
         <input type="radio" name="demo-${esc(sid)}" value="${esc(vr.id)}" data-demo-select="${esc(sid)}" ${sel?"checked":""}>
@@ -721,7 +785,7 @@ function renderDemo(demo, repliesByBlock){
         <a class="open" href="${url}" target="_blank" rel="noopener">открыть ↗</a>
       </label>
       <iframe class="mock" src="${url}" sandbox="allow-scripts" loading="lazy" title="${esc(vr.title||vr.id)}"></iframe>
-      ${cap}
+      <div class="v-body">${cap}${comment}${regionFooter(vr.id, repliesByBlock)}</div>
     </div>`;
   }
   const intro = demo.intro ? `<div class="md demo-intro">${md(demo.intro)}</div>` : "";
@@ -732,11 +796,34 @@ function labelWs(s){ return {todo:"к работе", in_progress:"в работ�
 // ----- interactions -----
 function wireBlocks(){
   document.querySelectorAll("[data-remove]").forEach(b => b.onclick = (e) => { e.stopPropagation(); removeDraft(b.getAttribute("data-remove")); });
-  document.querySelectorAll("[data-answer]").forEach(t => t.onchange = () => saveAnswer(t.getAttribute("data-answer"), t.value));
-  document.querySelectorAll('.question[data-kind="choice"] input').forEach(r =>
-    r.onchange = () => saveAnswer(r.closest("[data-question]").getAttribute("data-question"), r.value));
+  document.querySelectorAll("textarea[data-answer]").forEach(t => {
+    t.onchange = () => saveAnswer(t.getAttribute("data-answer"), t.value);
+    // own free-form answer wins over a picked option: clear radios as the human types
+    t.oninput = () => {
+      const q = t.closest('.question[data-kind="choice"]');
+      if(q && t.value.trim()) q.querySelectorAll('input[type="radio"]').forEach(r => r.checked = false);
+    };
+  });
+  document.querySelectorAll('.question[data-kind="choice"] input[type="radio"]').forEach(r =>
+    r.onchange = () => {
+      // picking an option wins over the own-answer field: clear it
+      const q = r.closest("[data-question]");
+      const own = q && q.querySelector("textarea[data-answer]");
+      if(own) own.value = "";
+      saveAnswer(q.getAttribute("data-question"), r.value);
+    });
   document.querySelectorAll("[data-demo-select]").forEach(r =>
     r.onchange = () => saveAnswer(r.getAttribute("data-demo-select"), r.value));
+  document.querySelectorAll("button.v-comment-send[data-comment-variant]").forEach(b =>
+    b.onclick = (e) => { e.preventDefault(); e.stopPropagation();
+      const vid = b.getAttribute("data-comment-variant");
+      const ta = document.querySelector(`textarea[data-comment-variant="${cssesc(vid)}"]`);
+      saveVariantComment(vid, ta ? ta.value : "", ta); });
+  document.querySelectorAll("textarea[data-comment-variant]").forEach(ta =>
+    ta.onkeydown = (e) => {
+      if(e.key === "Enter" && (e.metaKey || e.ctrlKey)){ e.preventDefault();
+        saveVariantComment(ta.getAttribute("data-comment-variant"), ta.value, ta); }
+    });
   // click a comment's quote -> scroll to & flash its highlight in the prose
   document.querySelectorAll(".cmt-quote[data-cid]").forEach(q =>
     q.onclick = () => flashTo(`mark.commented[data-cid="${cssesc(q.getAttribute("data-cid"))}"]`));
@@ -848,6 +935,14 @@ async function sendComment(){
   if(!text || !selTarget) return;
   await api("/draft", { method:"POST", body: JSON.stringify({ slug:SLUG, kind:"comment", blockId: selTarget.anchor, selectedText: selTarget.text, text }) });
   hidePopover(); await loadDraft(); toast("Добавлено в очередь");
+}
+// explicit per-variant comment: same contract as sendComment, anchored to the variant id
+async function saveVariantComment(variantId, value, ta){
+  const text = (value || "").trim();
+  if(!text || !variantId) return;
+  if(ta) ta.value = "";  // clear field so several comments can be left on one variant
+  await api("/draft", { method:"POST", body: JSON.stringify({ slug:SLUG, kind:"comment", blockId: variantId, selectedText: "", text }) });
+  await loadDraft(); toast("Добавлено в очередь");
 }
 
 // action bar
@@ -1086,11 +1181,22 @@ $("#changes").addEventListener("click", e => {
 });
 
 // ----- live action feed (incremental, delta-only) -----
-// feedModel: Map spanId -> { spanId, tool, arg, role, lane, ok, startTs, endTs, running, order }
+// feedModel: Map spanId -> { spanId, tool, arg, role, lane, ok, startTs, endTs, running, order, kind, server, mcpTool }
 let feedModel = new Map(), lastFeedOffset = 0, feedOrder = 0;
 let expandedAgents = new Set();           // lane keys with their section open
 let expandedSpans = new Set();            // lane keys whose "messages" block is open
 let feedMsgs = new Map();                 // lane key -> { messages, pending, loading }
+
+// ----- post-mortem agent cards (#trace-summary): expandable, lazy actions + messages -----
+// All UI state lives in these Sets/Maps (NOT in the DOM) so the 4s tick re-render of
+// #trace-summary never resets an open card / loaded actions / scroll. Keyed by agent spanId.
+let expandedCards = new Set();            // spanId of cards whose body is open
+let expandedCardActions = new Set();      // spanId whose "Действия" sub-section is open
+let expandedCardMsgs = new Set();         // spanId whose "Сообщения агента" sub-section is open
+let cardActions = new Map();              // spanId -> { actions, counts, description, pending, loading }
+let cardMsgs = new Map();                 // spanId -> { messages, pending, loading }
+let cardActionLimit = new Map();          // spanId -> how many actions to show (grows via "показать ещё")
+const CARD_ACTIONS_STEP = 40;             // initial + per-click page size
 
 function applyFeedEvents(events){
   (events || []).forEach(ev => {
@@ -1100,6 +1206,10 @@ function applyFeedEvents(events){
     // best-effort attribution: keep the more specific lane we have seen
     if(ev.tool != null) m.tool = ev.tool;
     if(ev.arg != null && ev.arg !== "") m.arg = ev.arg;
+    // MCP/type metadata (only on tool.start; carry forward if present)
+    if(ev.kind != null) m.kind = ev.kind;
+    if(ev.server != null) m.server = ev.server;
+    if(ev.mcpTool != null) m.mcpTool = ev.mcpTool;
     if(ev.role != null) m.role = ev.role;
     if(ev.lane != null && (m.lane == null || (m.lane === "orchestrator" && ev.lane !== "orchestrator"))) m.lane = ev.lane;
     if(ev.session_id != null) m.session = ev.session_id;
@@ -1124,6 +1234,15 @@ async function traceTick(){
     expandedSpans.forEach(key => {
       const st = feedMsgs.get(key);
       if(st && !st.loading && st.pending){ feedMsgs.delete(key); loadFeedMessages(key); }
+    });
+    // retry open post-mortem card sub-sections whose transcript was not ready yet
+    expandedCardActions.forEach(span => {
+      const st = cardActions.get(span);
+      if(st && !st.loading && st.pending){ cardActions.delete(span); loadCardActions(span, cardSession(span)); }
+    });
+    expandedCardMsgs.forEach(span => {
+      const st = cardMsgs.get(span);
+      if(st && !st.loading && st.pending){ cardMsgs.delete(span); loadCardMessages(span, cardSession(span)); }
     });
   } catch(e){ /* server may be restarting */ }
 }
@@ -1153,18 +1272,40 @@ function feedLanes(){
   });
 }
 
+// Classify an action by its kind/tool name into one of tool|bash|mcp|hook|subtask.
+// `kind` (from tool.start) is authoritative when present; otherwise infer from the tool name.
+function actType(kind, tool){
+  if(kind === "mcp" || kind === "bash" || kind === "tool" || kind === "hook" || kind === "subtask") return kind;
+  const t = tool || "";
+  if(t.startsWith("mcp__")) return "mcp";
+  if(t === "Bash") return "bash";
+  if(t === "Task" || t === "Agent") return "subtask";
+  return "tool";
+}
+// Human display name for an action. MCP collapses the long mcp__server__tool to "server · tool".
+function actName(m, type){
+  if(type === "mcp"){
+    if(m.server || m.mcpTool) return (m.server || "?") + " · " + (m.mcpTool || "?");
+    const body = (m.tool || "").startsWith("mcp__") ? m.tool.slice(5) : (m.tool || "");
+    const i = body.indexOf("__");
+    return i >= 0 ? body.slice(0,i) + " · " + body.slice(i+2) : (body || "mcp");
+  }
+  return m.tool || m.name || "—";
+}
+
 function feedActionRow(m, t0){
-  const tool = (m.tool || "").toLowerCase();
+  const type = actType(m.kind, m.tool);
+  const name = actName(m, type);
   const rel = (m.startTs != null && t0 != null) ? Math.max(0, (ep(m.startTs)||0) - t0) : null;
   const tcell = rel == null ? "" : fmtDur(rel);
   const dur = m.running
     ? `<span class="feed-dur run">идёт…</span>`
     : `<span class="feed-dur">${fmtDur(m.startTs!=null&&m.endTs!=null ? (ep(m.endTs)-ep(m.startTs)) : null)}</span>`;
-  const cls = m.running ? "running" : (m.ok === false ? "err" : "");
+  const cls = (m.running ? "running" : (m.ok === false ? "err" : "")) + " " + type;
   return `<div class="feed-row ${cls}" data-span="${esc(m.spanId)}">
     <div class="feed-line">
       <span class="feed-t">${esc(tcell)}</span>
-      <span class="feed-tool ${esc(tool)}">${esc(m.tool || "—")}</span>
+      <span class="feed-tool ${esc(type)}">${esc(name)}</span>
       ${m.arg ? `<span class="feed-arg">${esc(m.arg)}</span>` : ""}
       ${dur}
     </div>
@@ -1253,8 +1394,83 @@ async function loadFeedMessages(laneKey){
   renderFeed();
 }
 
+// Lazily load the per-agent action list for a post-mortem card (by spanId + session).
+// Same pending-retry contract as loadFeedMessages: re-fetch while the transcript is not ready.
+async function loadCardActions(spanId, session){
+  const cur = cardActions.get(spanId);
+  if(cur && (cur.loading || (cur.actions && !cur.pending))) return;
+  cardActions.set(spanId, { loading: true });
+  renderTraceSummary();
+  try {
+    const r = await api("/trace/actions?slug=" + encodeURIComponent(SLUG)
+      + "&agent=" + encodeURIComponent(spanId)
+      + "&session=" + encodeURIComponent(session || ""));
+    cardActions.set(spanId, {
+      loading: false,
+      pending: !!(r && r.pending),
+      actions: (r && r.actions) || [],
+      counts: (r && r.counts) || {},
+      description: r ? r.description : null,
+    });
+  } catch(e){
+    cardActions.set(spanId, { loading: false, pending: true, actions: [], counts: {}, description: null });
+  }
+  renderTraceSummary();
+}
+
+// Lazily load agent messages for a post-mortem card (reuses the live-feed /trace/messages contract).
+async function loadCardMessages(spanId, session){
+  const cur = cardMsgs.get(spanId);
+  if(cur && (cur.loading || (cur.messages && !cur.pending))) return;
+  cardMsgs.set(spanId, { loading: true });
+  renderTraceSummary();
+  try {
+    const r = await api("/trace/messages?slug=" + encodeURIComponent(SLUG)
+      + "&agent=" + encodeURIComponent(spanId)
+      + "&session=" + encodeURIComponent(session || ""));
+    cardMsgs.set(spanId, { loading: false, pending: !!(r && r.pending), messages: (r && r.messages) || [] });
+  } catch(e){
+    cardMsgs.set(spanId, { loading: false, pending: true, messages: [] });
+  }
+  renderTraceSummary();
+}
+
 // Delegated handler — the feed is re-rendered each tick, so bind once on #trace.
 $("#trace").addEventListener("click", e => {
+  // --- post-mortem card branches (#trace-summary) ---
+  // "показать ещё" inside a card's actions list — bump the per-card limit
+  const more = e.target.closest("[data-card-more]");
+  if(more){
+    const sp = more.dataset.cardMore;
+    cardActionLimit.set(sp, (cardActionLimit.get(sp) || CARD_ACTIONS_STEP) + CARD_ACTIONS_STEP);
+    renderTraceSummary();
+    return;
+  }
+  // toggle the "Действия" sub-section (lazy-load on open)
+  const actBtn = e.target.closest("[data-card-actions]");
+  if(actBtn){
+    const sp = actBtn.dataset.cardActions;
+    if(expandedCardActions.has(sp)){ expandedCardActions.delete(sp); renderTraceSummary(); }
+    else { expandedCardActions.add(sp); loadCardActions(sp, cardSession(sp)); }
+    return;
+  }
+  // toggle the "Сообщения агента" sub-section (lazy-load on open)
+  const cmsgBtn = e.target.closest("[data-card-msgs]");
+  if(cmsgBtn){
+    const sp = cmsgBtn.dataset.cardMsgs;
+    if(expandedCardMsgs.has(sp)){ expandedCardMsgs.delete(sp); renderTraceSummary(); }
+    else { expandedCardMsgs.add(sp); loadCardMessages(sp, cardSession(sp)); }
+    return;
+  }
+  // toggle the whole card body (clicking the head)
+  const cardHead = e.target.closest("[data-card]");
+  if(cardHead){
+    const sp = cardHead.dataset.card;
+    if(expandedCards.has(sp)) expandedCards.delete(sp); else expandedCards.add(sp);
+    renderTraceSummary();
+    return;
+  }
+  // --- live feed branches (#trace-feed) ---
   const head = e.target.closest(".feed-agent-head");
   if(head){
     const key = head.parentElement.dataset.lane;
@@ -1294,13 +1510,46 @@ function ensureTraceShell(){
   return { feed, summary: $("#trace-summary") };
 }
 
-function renderTrace(tr){
+// renderTrace caches the latest /trace model, then diff-renders via renderTraceSummary().
+// Splitting the fetch from the render lets lazy card loaders re-render the summary without a
+// fresh /trace round-trip, and keeps the tick's DOM write behind a cheap signature guard.
+let lastTrace = {}, lastTraceSig = "";
+function renderTrace(tr){ lastTrace = tr || {}; renderTraceSummary(); }
+
+// Resolve an agent's session from the cached /trace model (used by pending-retry loaders).
+function cardSession(spanId){
+  const a = (lastTrace.agents || []).find(x => x.spanId === spanId);
+  return a ? a.session_id : "";
+}
+
+function renderTraceSummary(){
   const { summary } = ensureTraceShell();
+  const tr = lastTrace;
   const agents = tr.agents || [];
-  if(!agents.length){ summary.innerHTML = `<p class="empty">Пока нет данных трейсинга — сводка появится, когда отработают сабагенты.</p>`; return; }
+  if(!agents.length){
+    if(summary.dataset.empty !== "1"){ summary.innerHTML = `<p class="empty">Пока нет данных трейсинга — сводка появится, когда отработают сабагенты.</p>`; summary.dataset.empty = "1"; lastTraceSig = ""; }
+    return;
+  }
   const subs = agents.filter(a => a.kind === "subagent");
   const orch = agents.filter(a => a.kind === "orchestrator");
   const T = tr.totals || {};
+
+  // Cheap signature: anything that changes the rendered summary must appear here, or a tick
+  // would skip the DOM write (good — preserves open cards/scroll) while a click that toggles
+  // state would fail to re-render. So include agent identity + summary + every interactive flag.
+  const sig = agents.map(a => {
+    const sp = a.spanId || "";
+    const ca = cardActions.get(sp), cm = cardMsgs.get(sp);
+    return sp + "~" + (a.summary||"") + "~" + (a.durationMs||"") + "/" + (a.out||"") + "/" + (a.ok===false?"x":"")
+      + (expandedCards.has(sp)?"|C":"")
+      + (expandedCardActions.has(sp)?"|A":"") + (expandedCardMsgs.has(sp)?"|M":"")
+      + (ca?("a"+(ca.loading?"L":"")+(ca.pending?"P":"")+((ca.actions||[]).length)):"")
+      + (cm?("m"+(cm.loading?"L":"")+(cm.pending?"P":"")+((cm.messages||[]).length)):"")
+      + "n" + (cardActionLimit.get(sp)||"");
+  }).join(";") + "#" + (tr.sessions?tr.sessions.length:0) + "/" + (T.agents||0) + "/" + (T.out||0);
+  if(sig === lastTraceSig && summary.dataset.empty === "0") return;
+  lastTraceSig = sig;
+  summary.dataset.empty = "0";
 
   // --- summary ---
   const byModel = Object.entries(T.byModel || {})
@@ -1330,6 +1579,65 @@ function renderTrace(tr){
   h += card("Сабагенты", body);
 
   summary.innerHTML = h;
+}
+
+// Legend chips counting actions by type (textual/unicode glyphs, no CDN).
+const ACT_TYPE_META = {
+  tool:    { label: "инструменты", glyph: "🔧", c: "var(--t-tool)" },
+  bash:    { label: "bash",        glyph: "⌨",  c: "var(--t-bash)" },
+  mcp:     { label: "mcp",         glyph: "🔌", c: "var(--t-mcp)" },
+  subtask: { label: "под-задачи",  glyph: "🧩", c: "var(--t-subtask)" },
+  hook:    { label: "hooks",       glyph: "⚙",  c: "var(--t-hook)" },
+};
+function actLegend(counts){
+  const chips = ["tool","bash","mcp","subtask","hook"]
+    .filter(t => (counts && counts[t]) > 0)
+    .map(t => { const meta = ACT_TYPE_META[t];
+      return `<span class="lchip"><span class="ldot" style="background:${meta.c}"></span>${meta.glyph} ${counts[t]}</span>`; })
+    .join("");
+  return chips ? `<div class="legend">${chips}</div>` : "";
+}
+function actStatusChip(status){
+  if(status === "running") return `<span class="run-status running">идёт…</span>`;
+  if(status === "error")   return `<span class="run-status failed">err</span>`;
+  return `<span class="run-status done">ok</span>`;
+}
+// One chronological action row inside a post-mortem card (single timeline, colour-typed by type).
+function actRow(a){
+  const type = ["tool","bash","mcp","subtask","hook"].includes(a.type) ? a.type : "tool";
+  const cls = type + (a.status === "running" ? " running" : (a.status === "error" ? " err" : ""));
+  const tcell = (typeof a.relMs === "number") ? fmtDur(a.relMs) : "";
+  return `<div class="act-row ${cls}">
+    <span class="act-t">${esc(tcell)}</span>
+    <span class="act-type">${esc(type)}</span>
+    <span class="act-name">${esc(a.name || "—")}</span>
+    ${a.arg ? `<span class="act-arg">${esc(a.arg)}</span>` : ""}
+    <span class="act-status">${actStatusChip(a.status)}</span>
+  </div>`;
+}
+// Render the "Действия" sub-section body for a card (legend + chronological timeline + "показать ещё").
+function cardActionsBody(spanId){
+  const st = cardActions.get(spanId);
+  if(!st || st.loading) return `<div class="feed-empty">действия загружаются…</div>`;
+  if(st.pending) return `<div class="feed-empty">действия ещё подгружаются…</div>`;
+  const acts = st.actions || [];
+  if(!acts.length) return `<div class="feed-empty">действий нет.</div>`;
+  const limit = cardActionLimit.get(spanId) || CARD_ACTIONS_STEP;
+  const shown = acts.slice(0, limit);
+  const rows = shown.map(actRow).join("");
+  const rest = acts.length - shown.length;
+  const more = rest > 0 ? `<div class="act-more" data-card-more="${esc(spanId)}">показать ещё ${rest > CARD_ACTIONS_STEP ? CARD_ACTIONS_STEP : rest} →</div>` : "";
+  return actLegend(st.counts) + `<div class="act-timeline">${rows}</div>` + more;
+}
+// Render the "Сообщения агента" sub-section body for a card (reuses /trace/messages + md()).
+function cardMsgsBody(spanId){
+  const st = cardMsgs.get(spanId);
+  if(!st || st.loading) return `<div class="feed-empty">сообщения загружаются…</div>`;
+  if(st.pending) return `<div class="feed-empty">сообщения ещё подгружаются…</div>`;
+  if(!st.messages || !st.messages.length) return `<div class="feed-empty">сообщений нет.</div>`;
+  return `<div class="feed-msgs">` + st.messages.map(msg =>
+    `<div class="feed-msg"><span class="feed-t">+${esc(fmtDur(msg.relMs))}</span><div class="md">${md(msg.text||"")}</div></div>`
+  ).join("") + `</div>`;
 }
 function stat(v, k){ return `<div class="stat"><div class="v">${esc(String(v))}</div><div class="k">${esc(k)}</div></div>`; }
 
@@ -1375,12 +1683,33 @@ function agentCard(a, window){
     a.ok === false ? `<span class="tag fail">ошибка</span>` : "",
     !a.hasUsage ? `<span class="tag">нет токенов</span>` : "",
   ].join("");
-  return `<div class="agent ${a.kind==='orchestrator'?'orch':''} ${a.ok===false?'err':''}">
-    <div class="agent-head">
+  const span = a.spanId || "";
+  // a span without a tool-use id ("span-" / "") cannot resolve a transcript — keep that card flat
+  const expandable = span && span !== "span-";
+  const open = expandable && expandedCards.has(span);
+  const desc = a.summary
+    ? `<span class="agent-desc"><span class="lbl">задача:</span> ${esc(a.summary)}</span>` : "";
+  // expandable body: "Действия" (lazy /trace/actions) + "Сообщения агента" (lazy /trace/messages)
+  const actOpen = expandedCardActions.has(span);
+  const msgOpen = expandedCardMsgs.has(span);
+  const body = expandable ? `<div class="agent-body">
+      <div class="card-sub">
+        <div class="card-subbtn ${actOpen?"open":""}" data-card-actions="${esc(span)}"><span class="card-subcaret">▸</span>Действия</div>
+        ${actOpen ? cardActionsBody(span) : ""}
+      </div>
+      <div class="card-sub">
+        <div class="card-subbtn ${msgOpen?"open":""}" data-card-msgs="${esc(span)}"><span class="card-subcaret">▸</span>Сообщения агента</div>
+        ${msgOpen ? cardMsgsBody(span) : ""}
+      </div>
+    </div>` : "";
+  return `<div class="agent ${a.kind==='orchestrator'?'orch':''} ${a.ok===false?'err':''} ${open?'open':''}" data-card-span="${esc(span)}">
+    <div class="agent-head ${expandable?"clickable":""}" ${expandable?`data-card="${esc(span)}"`:""}>
+      ${expandable?`<span class="agent-caret">▸</span>`:""}
       <span class="role" style="background:${roleColor(a.role)}">${esc(a.role||"—")}</span>
       ${a.workstream?`<span class="ws">${esc(a.workstream)}</span>`:""}
       ${a.model?`<span class="tag">${esc(a.model)}</span>`:""}
       ${tags}
+      ${desc}
     </div>
     <div class="metrics">
       <div class="metric"><div class="k">время</div><div class="v">${fmtDur(a.durationMs)}</div></div>
@@ -1389,6 +1718,7 @@ function agentCard(a, window){
       <div class="metric"><div class="k">≈ стоимость</div><div class="v">${fmtUsd(a.costUsd)}</div></div>
       ${ctx}
     </div>
+    ${body}
   </div>`;
 }
 

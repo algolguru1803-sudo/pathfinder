@@ -4,6 +4,57 @@
 
 <!-- Новые записи — сверху. -->
 
+## 2026-06-13 — agent-trace-details
+- **Что:** Вкладка «Трейсинг» детализирована по агентам. Бэкенд (`scripts/telemetry_hook.py`,
+  `scripts/_aipf.py`, `scripts/server.py`; новый `tests/test_telemetry_actions.py`):
+  - **MCP в ленте (b1).** В `tool.*`-ветку `build_event` (`scripts/telemetry_hook.py:134`) добавлен захват
+    `mcp__*` той же механикой (`spanId="tool-"+toolUseId`). В `tool.start` дозаписаны НОВЫЕ поля: `kind`
+    (`mcp`/`bash`/`tool`), для MCP ещё `server`/`mcpTool` (`_parse_mcp_name`, разделитель `__`; `arg` —
+    первое строковое значение input, обрезка 200). Старый формат/порядок `tool.*` не тронут.
+  - **Описание задачи в `/trace` (b2).** `_agent_record(..., summary=...)` (`scripts/_aipf.py:776`) кладёт
+    `summary` в запись агента; под-агент — `subagent.start.summary`, оркестратор — авто-подпись
+    `"оркестратор сессии"` (q5=A).
+  - **Ленивый `GET /trace/actions?slug&agent&session` (b3).** `_trace_actions` (`scripts/server.py:394`),
+    читалка `parse_transcript_actions` (`scripts/_aipf.py:451`), мост спан→транскрипт через sidecar
+    `agent-*.meta.json` (`find_subagent_meta` `:263`, `_agent_description` `scripts/server.py:439`). Читает
+    ОДИН транскрипт по раскрытию, read-only, mtime-кэш ~3 с. Контракт `{description, actions, counts,
+    pending}`, идёт по ВСЕМ session_id задачи.
+  - **Фронтенд (b4/b5)** правился параллельно: посмертная карточка агента стала раскрываемой (описание +
+    две ленивые секции «Действия»/«Сообщения агента», единая хронология v2), живая лента типизирует
+    MCP-строки `server · tool`.
+- **Зачем:** lane из хука best-effort и не даёт достоверной по-агентной сводки (исполнителя нет в payload).
+  Exploration вскрыл дрейф знаний: sidecar `meta.json.toolUseId` == `spanId` под-агента даёт
+  **детерминированный** мост спан→транскрипт→его `tool_use` (вкл. MCP) в обход lane; у одной задачи бывает
+  несколько session_id (поправка к ADR-0003). Достоверный список вынесен в ленивый эндпоинт, чтобы не
+  грузить горячий путь ленты (ADR-0001) и не утяжелять `build_trace`.
+- **Ключевое решение:** точная атрибуция через транскрипт + `meta.json`, новый ленивый `/trace/actions`
+  вместо расширения `/trace`, MCP — дозаписью полей `kind/server/mcpTool` (ADR-0009, поправка к ADR-0003).
+- **План:** `.workflow/tasks/agent-trace-details/plan.md`
+- **ADR:** `decisions/ADR-0009-transcript-attribution-and-actions-endpoint.md`
+- **Область:** `areas/telemetry-tracing.md`
+
+## 2026-06-13 — dashboard-feedback-enhancements
+- **Что:** Во вкладку «Контент» дашборда (`templates/dashboard.html`) добавлены две возможности
+  обратной связи **без правок `scripts/server.py`**:
+  - **Свой ответ на `choice`-вопрос** — под radio-опциями всегда видимое поле `<textarea data-answer>`
+    (`render()` ветка choice, `:670`/`:677`). Приходит как обычный `answer` того же `questionId`;
+    свой ответ перебивает выбор опции и наоборот (`wireBlocks` `:760`/`:766`), один `answer` на вопрос
+    (серверный дедуп). `answer.text` может не совпадать ни с одной `options` — это свободный ответ.
+  - **Коммент к демо-варианту** — у каждого `demo.variants[]` всегда видимое поле → `comment` с
+    `blockId = vr.id`, `selectedText:""` (`saveVariantComment` `:898`). `regionFooter(vr.id)` теперь
+    рендерится один раз на вариант (в т.ч. без `caption`, `renderDemo` `:746`), поэтому реплаи агента
+    по `blockId===vr.id` видны всегда.
+  - Синхронизирована документация скилла: `skills/feature/dashboard-guide.md`,
+    `skills/feature/feedback-loop.md` (контракт чтения submission для агента).
+- **Зачем:** закрыть два разрыва в обратной связи (нельзя было ответить своей формулировкой; нельзя
+  было прокомментировать вариант без caption — и реплаи к такому варианту были невидимы). Backend
+  агностичен к содержимому items, поэтому обе фичи — чистый фронтенд + синк доков скилла.
+- **Ключевое решение:** реюз существующего draft-контракта (`answer` вне `options`; `comment` с
+  `blockId=vr.id`) вместо новых полей/флагов/эндпоинтов → 0 правок сервера (ADR-0008).
+- **План:** `.workflow/tasks/dashboard-feedback-enhancements/plan.md`
+- **ADR:** `decisions/ADR-0008-feedback-on-existing-contract-zero-server.md`
+- **Область:** `areas/dashboard-feedback-ui.md`
+
 ## 2026-06-12 — new-product-workflow
 - **Что:** Добавлена команда-оркестратор `/new-product` — создание продукта с нуля (greenfield).
   Стадии `INTAKE → DISCOVER → PRD → PRD-GATE → PHASE-PLAN → PLAN-GATE → BUILD → SHIP → DONE` с

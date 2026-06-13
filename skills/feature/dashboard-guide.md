@@ -54,6 +54,11 @@ Field notes:
   cards it is the literal anchor `summary` or `codebaseMap`. Each comment carries the quoted
   `selectedText`. A reply you write under the same anchor (see `feedback-loop.md`) renders inline
   beneath that block/card — so reply with `blockId: "summary"` to answer a comment on the summary.
+- **Свой ответ на choice-вопрос**: у вопроса с `kind:"choice"` человек, помимо готовых `options`, может
+  ввести **свою формулировку** в поле свободного ответа. Это приходит как обычный `answer` того же
+  `questionId`, но его `text` **может не совпадать ни с одной из `options`** — не считай такой ответ
+  невалидным, прими свободный текст. На вопрос приходит **один `answer`**: свой ответ перебивает
+  выбранную опцию (и наоборот), так что просто читай `answer.text` как ответ человека.
 - **Stable ids** are essential: `planBlocks[].id` and `questions[].id` must stay constant across
   iterations, because the human's comments and your replies are keyed to them. Reuse ids when you edit
   a block; only mint a new id for a genuinely new block.
@@ -67,6 +72,11 @@ Field notes:
   `caption` is a commentable region (anchor = the variant's `id`), so the human can comment on a variant
   and you reply under it via `replies.json` exactly like a plan block. Variant `id`/`selectionId` are
   stable ids — keep them constant across iterations.
+  - **Явное поле комментария к варианту**: у каждого варианта есть всегда видимое поле комментария,
+    формирующее `comment` с `blockId = <variants[].id>` и (обычно) пустым `selectedText`. Твой реплай
+    в `replies.json` по тому же `blockId` рендерится под этим вариантом — как и раньше работало через
+    выделение текста в `caption`, но теперь и у варианта **без `caption`** (раньше footer с реплаями
+    появлялся только при наличии caption).
 - **`updatedAt`**: bump it every write — the page uses it (plus phase/status/reply-count) to detect
   changes and re-render.
 

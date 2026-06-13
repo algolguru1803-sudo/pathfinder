@@ -75,9 +75,13 @@ When you reach a checkpoint (end of an iteration where you want human input, or 
    - If nothing new (a rare spurious return), re-park (repeat steps 1–2).
 3. **Processing a submission:** for each item (`kind: "comment"` with `blockId`+`selectedText`, or
    `kind: "answer"` with `questionId`), apply the change to `plan.md`/`questions.md`/code as
-   appropriate. A comment's `blockId` is the anchor of the commented region: a plan-block id (`b1`…)
-   **or** a prose-section anchor (`summary` / `codebaseMap`); `selectedText` is the exact fragment the
-   human highlighted — use it to locate what they mean. Then append a reply to `replies.json` keyed by
+   appropriate. A comment's `blockId` is the anchor of the commented region: a plan-block id (`b1`…),
+   a prose-section anchor (`summary` / `codebaseMap`), **or** a demo-variant id (`variants[].id`, напр.
+   `v2`) — у варианта теперь есть явное поле комментария, так что `comment` может прийти и на него;
+   `selectedText` is the exact fragment the human highlighted (для коммента к варианту он обычно пустой)
+   — use it to locate what they mean. Учти также, что `answer` по `questionId` может содержать **свободный
+   текст вне `options`** (человек ответил своей формулировкой на choice-вопрос) — прими его как ответ, не
+   отбраковывай. Then append a reply to `replies.json` keyed by
    the same `blockId`/`questionId` with a one- to two-sentence Russian note on what you did. Update `lastSubmission`, bump `iteration`,
    rewrite `dashboard.json` (status back to `working`, then to `awaiting-batch` for the next round).
 
@@ -86,6 +90,7 @@ When you reach a checkpoint (end of an iteration where you want human input, or 
 ```json
 { "replies": [
   { "blockId": "b1", "text": "Переименовал функцию в export_to_csv, обновил блок 1.", "ts": "..." },
+  { "blockId": "v2", "text": "Учёл правку макета варианта B: подвинул сайдбар влево.", "ts": "..." },
   { "questionId": "q1", "text": "Принято: разделитель — запятая.", "ts": "..." }
 ] }
 ```

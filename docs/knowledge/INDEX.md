@@ -11,8 +11,9 @@
 - [task-log.md](task-log.md) — журнал задач: что и зачем менялось. _темы: история, решения_
 
 ## Области (areas/)
-- [areas/telemetry-tracing.md](areas/telemetry-tracing.md) — телеметрия и вкладка «Трейсинг»: схема событий, контракты `/trace/feed` и `/trace/messages`, ловушки. _темы: телеметрия, трейсинг, хуки, лента_
+- [areas/telemetry-tracing.md](areas/telemetry-tracing.md) — телеметрия и вкладка «Трейсинг»: схема событий (вкл. `tool.start.kind`/MCP), контракты `/trace/feed`, `/trace/messages`, `/trace/actions`, sidecar `meta.json` и мост спан→транскрипт, ловушки. _темы: телеметрия, трейсинг, хуки, лента, MCP, атрибуция_
 - [areas/dashboard-changes-tab.md](areas/dashboard-changes-tab.md) — вкладка «Изменения»: `/changes` и `/changes?file=`, поле `untracked`, дерево файлов на фронте, встроенная подсветка diff. _темы: дашборд, git, дерево, подсветка_
+- [areas/dashboard-feedback-ui.md](areas/dashboard-feedback-ui.md) — ввод обратной связи на вкладке «Контент»: свой ответ на choice (`answer` вне `options`, перебивает опцию), коммент к демо-варианту (`comment` с `blockId=vr.id`, footer всегда), модель draft, якоря, дедуп, рендер реплаев. _темы: дашборд, обратная связь, draft, answer, comment_
 - [areas/orchestrator-skills.md](areas/orchestrator-skills.md) — анатомия скиллов-оркестраторов (`/feature`, `/new-product`): регистрация конвенцией каталогов, паттерн SKILL.md + reference-файлы, frontmatter агентов с `model:`, ростеры `wf-*` vs `np-*`, правило «модель глобальна для subagent_type» и «субагенты не спавнят субагентов», карта стадий + build-loop. _темы: оркестратор, скиллы, под-агенты, регистрация, модели_
 
 ## Решения (decisions/)
@@ -23,5 +24,7 @@
 - [decisions/ADR-0005-untracked-noise-filter-zero-byte-toggle.md](decisions/ADR-0005-untracked-noise-filter-zero-byte-toggle.md) — фильтр untracked-мусора по 0 байт + тумблер «только tracked / все»
 - [decisions/ADR-0006-np-agent-roster-model-pinning.md](decisions/ADR-0006-np-agent-roster-model-pinning.md) — отдельный ростер `np-*` с моделью в `model:`-frontmatter (fable-мыслитель / opus-исполнители); почему не реюз `wf-*` (модель глобальна для subagent_type); урезанный tool-set мыслителя как структурная «digest-only» гарантия
 - [decisions/ADR-0007-evolutionary-build-loop.md](decisions/ADR-0007-evolutionary-build-loop.md) — эволюционный build-loop `/new-product`: гибридный гейт (тесты — стена, судья — руль), вердикт-объект, изолированный судья на измерение, замороженные PRD-тесты (анти-гейминг), Reflexion-scratchpad, три стоп-условия + анти-осцилляция, контекстный `approve-plan`, гейт-политика V1
+- [decisions/ADR-0008-feedback-on-existing-contract-zero-server.md](decisions/ADR-0008-feedback-on-existing-contract-zero-server.md) — свой ответ как `answer` вне `options` (перебивает опцию, один answer/вопрос) и коммент к варианту как `comment` с `blockId=vr.id` (footer всегда); 0 правок сервера — бэкенд агностичен к содержимому items
+- [decisions/ADR-0009-transcript-attribution-and-actions-endpoint.md](decisions/ADR-0009-transcript-attribution-and-actions-endpoint.md) — поправка к ADR-0003: достоверная по-агентная атрибуция через транскрипт + `meta.json.toolUseId` (мост спан→транскрипт), ленивый `/trace/actions` вместо утяжеления `build_trace`, MCP в ленте дозаписью `kind/server/mcpTool`; lane остаётся best-effort, у задачи бывает несколько session_id
 
-_updated: 2026-06-12_
+_updated: 2026-06-13_

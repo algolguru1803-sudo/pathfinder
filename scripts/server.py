@@ -196,6 +196,12 @@ class Handler(BaseHTTPRequestHandler):
             agent = (qs.get("agent") or [""])[0]
             session = (qs.get("session") or [""])[0]
             return self._json(200, self._trace_messages(slug, agent, session))
+        if path == "/trace/actions":
+            if not slug:
+                return self._json(400, {"error": "missing slug"})
+            agent = (qs.get("agent") or [""])[0]
+            session = (qs.get("session") or [""])[0]
+            return self._json(200, self._trace_actions(slug, agent, session))
         if path == "/changes":
             if not slug:
                 return self._json(400, {"error": "missing slug"})
@@ -329,6 +335,10 @@ class Handler(BaseHTTPRequestHandler):
     _feed_cache = {}              # slug -> {since, exp, data}
     _feed_lock = threading.Lock()
 
+    # ---- lazy per-agent actions (transcript-derived) -------------------
+    _actions_cache = {}           # (slug, agent) -> {mt, exp, data}
+    _actions_lock = threading.Lock()
+
     def _trace_feed(self, slug, since):
         """Incremental action feed for the trace tab. Reads only the tail of
         telemetry.jsonl past `since` (byte offset) and returns delta tool.*
@@ -380,6 +390,77 @@ class Handler(BaseHTTPRequestHandler):
                    if (e0 is not None and base is not None) else None)
             messages.append({"ts": m.get("ts"), "relMs": rel, "text": m.get("text")})
         return {"messages": messages, "pending": False}
+
+    def _trace_actions(self, slug, agent, session=""):
+        """Lazily load one agent's tool actions from its transcript (on explicit
+        expand). `agent` is a sub-agent spanId ("span-<toolUseId>") or an
+        attributionAgent role; `session` optionally scopes the search. Returns
+        the fixed contract:
+            {description, actions:[{type,name,arg,status,ts,relMs}],
+             counts:{tool,bash,mcp,subtask,hook}, pending}
+        `pending` is true when the transcript does not exist yet (graceful
+        degrade). `description` is the agent's task description (sub-agent
+        meta.json, matched by toolUseId) or null. Read-only — never touches the
+        Langfuse cursor. Short mtime-keyed cache per (slug, agent), like /trace,
+        because a transcript can be large."""
+        empty_counts = {"tool": 0, "bash": 0, "mcp": 0, "subtask": 0, "hook": 0}
+        try:
+            path, kind = self._resolve_transcript(slug, agent, session)
+        except Exception:
+            path, kind = None, None
+        if not path or not os.path.isfile(path):
+            return {"description": None, "actions": [], "counts": dict(empty_counts),
+                    "pending": True}
+        key = (slug, agent)
+        try:
+            mt = os.path.getmtime(path)
+        except OSError:
+            mt = 0
+        now = time.time()
+        with Handler._actions_lock:
+            cached = Handler._actions_cache.get(key)
+            if cached and cached["mt"] == mt and now < cached["exp"]:
+                return cached["data"]
+        try:
+            parsed = _aipf.parse_transcript_actions(path)
+            actions = parsed.get("actions", [])
+            counts = parsed.get("counts", dict(empty_counts))
+        except Exception as e:  # never break the page
+            return {"description": None, "actions": [], "counts": dict(empty_counts),
+                    "pending": False, "error": str(e)}
+        description = self._agent_description(slug, agent, session)
+        data = {"description": description, "actions": actions,
+                "counts": counts, "pending": False}
+        with Handler._actions_lock:
+            Handler._actions_cache[key] = {"mt": mt, "exp": now + 3, "data": data}
+        return data
+
+    def _agent_description(self, slug, agent, session=""):
+        """Resolve an agent's task description from the sub-agent meta.json
+        sidecars (matched by toolUseId == spanId without the `span-` prefix).
+        Best-effort: returns None if no sidecar matches (the description also
+        flows through /trace via subagent.start.summary)."""
+        if not agent or not agent.startswith("span-"):
+            return None
+        want = agent[len("span-"):]
+        ws = self.workspace
+        tpath = ws.task_file(slug, "telemetry.jsonl")
+        session_ids = []
+        for line in _aipf._iter_lines(tpath):
+            try:
+                ev = json.loads(line)
+            except ValueError:
+                continue
+            sid = ev.get("session_id")
+            if sid and sid not in session_ids:
+                session_ids.append(sid)
+        if session:
+            session_ids = [s for s in session_ids if s == session] or session_ids
+        for sid in session_ids:
+            for meta in _aipf.find_subagent_meta(sid):
+                if meta.get("toolUseId") == want:
+                    return meta.get("description")
+        return None
 
     def _resolve_transcript(self, slug, agent, session=""):
         """Locate the transcript file for `agent` within a task's sessions.

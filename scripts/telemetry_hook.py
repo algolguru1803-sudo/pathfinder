@@ -131,10 +131,12 @@ def build_event(payload):
                     "ok": _result_ok(_tool_result(payload))}
         return slug, [file_touch, tool_end]
 
-    if event in ("PreToolUse", "PostToolUse") and tool_name in TRACE_TOOLS:
-        # Live trace feed: start/end timings for the significant tool set. Runs
-        # ONLY for TRACE_TOOLS; every other tool (TodoWrite etc.) falls through
-        # and the hook exits without writing — that is the noise filter.
+    is_mcp = isinstance(tool_name, str) and tool_name.startswith("mcp__")
+    if event in ("PreToolUse", "PostToolUse") and (tool_name in TRACE_TOOLS or is_mcp):
+        # Live trace feed: start/end timings for the significant tool set plus
+        # MCP calls (mcp__<server>__<tool>). Runs ONLY for TRACE_TOOLS / mcp__*;
+        # every other tool (TodoWrite etc.) falls through and the hook exits
+        # without writing — that is the noise filter.
         slug = resolve_slug(root, session_id, tool_input)
         if not slug:
             return None, None
@@ -143,8 +145,18 @@ def build_event(payload):
         # state.json read on this hot path.
         span = "tool-" + tool_use_id if tool_use_id else None
         if event == "PreToolUse":
+            # `kind` lets the front-end type rows without a hard-coded name list;
+            # MCP rows additionally carry `server`/`mcpTool`. New fields only —
+            # old `tool.*` fields/order are untouched (Langfuse cursor invariant).
+            if is_mcp:
+                server, mcp_tool = _parse_mcp_name(tool_name)
+                return slug, {**base, "event": "tool.start", "tool": tool_name,
+                              "toolUseId": tool_use_id, "spanId": span,
+                              "kind": "mcp", "server": server, "mcpTool": mcp_tool,
+                              "arg": _mcp_arg(tool_input)}
             return slug, {**base, "event": "tool.start", "tool": tool_name,
                           "toolUseId": tool_use_id, "spanId": span,
+                          "kind": "bash" if tool_name == "Bash" else "tool",
                           "arg": _trace_arg(tool_name, tool_input)}
         return slug, {**base, "event": "tool.end", "tool": tool_name,
                       "toolUseId": tool_use_id, "spanId": span,
@@ -178,6 +190,33 @@ def _trace_arg(tool_name, tool_input):
     if not field:
         return None
     return _summary(tool_input.get(field), limit=200)
+
+
+def _parse_mcp_name(tool_name):
+    """Split `mcp__<server>__<tool>` into (server, tool).
+
+    Verified on real transcripts: the server<->tool delimiter is always `__`,
+    while the server name itself may contain single underscores (e.g.
+    `plugin_ai-pathfinder_context7`). Defensive: if there is no `__` delimiter
+    after the prefix, everything lands in the tool name and server is "".
+    """
+    body = tool_name[len("mcp__"):]
+    server, sep, mcp_tool = body.partition("__")
+    if not sep:
+        return "", body
+    return server, mcp_tool
+
+
+def _mcp_arg(tool_input):
+    """Best-effort key argument for an MCP call (q6=B): MCP tools have no single
+    canonical field, so surface the first non-empty string value of the input,
+    trimmed to 200. Never raise on a non-dict input."""
+    if not isinstance(tool_input, dict):
+        return ""
+    for v in tool_input.values():
+        if isinstance(v, str) and v:
+            return _summary(v, limit=200) or ""
+    return ""
 
 
 def _tool_result(payload):
