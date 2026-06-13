@@ -11,6 +11,13 @@
     --ok: #16a34a; --warn: #d97706; --chip: #f3f4f6;
     --reply-bg: #f0fdf4; --reply-line: #bbf7d0;
     --sel: #fef9c3; --shadow: 0 1px 3px rgba(0,0,0,.08), 0 8px 24px rgba(0,0,0,.06);
+    --grid: rgba(0,0,0,.06);
+    /* фазовые тинты таймлайна (фон-регионы) */
+    --ph-explore: rgba(14,165,233,.13);  --ph-explore-line: #0ea5e9;
+    --ph-elaborate: rgba(139,92,246,.13); --ph-elaborate-line: #8b5cf6;
+    --ph-implement: rgba(16,185,129,.13); --ph-implement-line: #10b981;
+    --ph-verify: rgba(245,158,11,.14);    --ph-verify-line: #f59e0b;
+    --ph-none: rgba(100,116,139,.08);     --ph-none-line: #94a3b8;
   }
   @media (prefers-color-scheme: dark) {
     :root {
@@ -18,6 +25,10 @@
       --line: #2a2f37; --accent: #818cf8; --accent-soft: #1e2230;
       --chip: #232830; --reply-bg: #132019; --reply-line: #1f4d31;
       --sel: #3b3a1f; --shadow: 0 1px 3px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.3);
+      --grid: rgba(255,255,255,.07);
+      --ph-explore: rgba(14,165,233,.18);  --ph-elaborate: rgba(139,92,246,.18);
+      --ph-implement: rgba(16,185,129,.18); --ph-verify: rgba(245,158,11,.18);
+      --ph-none: rgba(148,163,184,.12);
     }
   }
   * { box-sizing: border-box; }
@@ -162,11 +173,49 @@
   .stat .k { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
   .bymodel { font-size: 12px; color: var(--muted); margin-top: 10px; }
 
-  .gantt { display: flex; flex-direction: column; gap: 5px; }
-  .lane { position: relative; height: 24px; }
-  .bar { position: absolute; height: 20px; top: 2px; border-radius: 6px; display: flex; align-items: center; padding: 0 7px; font-size: 11px; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,.15); }
-  .bar.err { outline: 2px solid #ef4444; outline-offset: -2px; }
-  .axis { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-top: 6px; }
+  /* timeline (Вариант C): token-overview + phases + brush + detail zone */
+  .g-legend { display: flex; flex-wrap: wrap; gap: 6px 12px; margin: 0 0 8px; align-items: center; }
+  .g-legend.ph { margin-top: 0; }
+  .g-legend .lchip { background: none; padding: 0; font-weight: 400; color: var(--muted); }
+  .g-legend .ldot { width: 10px; height: 10px; border-radius: 3px; }
+  .g-legend .ldot.run { background: repeating-linear-gradient(45deg, var(--muted) 0 3px, transparent 3px 6px); }
+  .g-legend .ldot.err { background: transparent; outline: 2px solid #ef4444; outline-offset: -2px; }
+  .g-legend .lbar { width: 16px; height: 10px; border-radius: 2px; border: 1px solid var(--line); flex: none; }
+  .legtitle { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-right: 2px; }
+  .sub { font-size: 12px; color: var(--muted); margin: 0 0 8px; }
+
+  .ov { position: relative; border: 1px solid var(--line); border-radius: 10px; padding: 0; overflow: hidden; }
+  .ov-phases { position: relative; border-bottom: 1px solid var(--line); background: var(--panel); }
+  .ov-phband { position: absolute; height: 16px; display: flex; align-items: center; padding: 0 5px; font: 10px ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap; overflow: hidden; border-left: 2px solid var(--muted); }
+  .ov-svg { display: block; width: 100%; height: 78px; cursor: crosshair; }
+  .ov-axis { position: relative; height: 20px; border-top: 1px solid var(--line); background: var(--panel); }
+  .ov-tick { position: absolute; top: 3px; font: 11px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted); transform: translateX(-50%); }
+  .ov-brush { position: absolute; height: 78px; background: var(--accent-soft); border-left: 2px solid var(--accent); border-right: 2px solid var(--accent); opacity: .5; pointer-events: none; }
+  .ov-hint { font-size: 11px; color: var(--muted); margin: 8px 2px 0; }
+
+  .det-wrap { margin-top: 14px; overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
+  .det-inner { position: relative; min-width: 640px; }
+  .det-phases { position: relative; height: 16px; border-bottom: 1px solid var(--line); }
+  .det-phband { position: absolute; top: 0; height: 16px; display: flex; align-items: center; padding: 0 5px; font: 10px ui-monospace, monospace; white-space: nowrap; overflow: hidden; border-left: 2px solid var(--muted); }
+  .det-axis { position: relative; height: 22px; border-bottom: 1px solid var(--line); }
+  .det-tick { position: absolute; top: 4px; left: 0; font: 11px ui-monospace, monospace; color: var(--muted); }
+  .det-tick::before { content: ""; position: absolute; left: 0; top: -4px; height: 999px; border-left: 1px solid var(--grid); }
+  .det-phbg { position: absolute; top: 0; bottom: 0; z-index: 0; pointer-events: none; }
+  .det-lanes { position: relative; z-index: 1; }
+  .det-lane { position: relative; height: 28px; border-bottom: 1px dashed var(--line); }
+  .det-bar { position: absolute; top: 4px; height: 20px; border-radius: 5px; display: flex; align-items: center; gap: 5px; padding: 0 7px; font-size: 11px; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,.18); border-left: 3px solid rgba(0,0,0,.28); cursor: pointer; min-width: 4px; }
+  .det-bar:hover { filter: brightness(1.08); box-shadow: 0 0 0 2px var(--accent); z-index: 3; }
+  .det-bar.err { outline: 2px solid #ef4444; outline-offset: -2px; }
+  .det-bar.running { background-image: repeating-linear-gradient(45deg, rgba(255,255,255,.28) 0 6px, transparent 6px 12px); }
+  .det-bar .du { opacity: .85; font: 10px ui-monospace, monospace; }
+  .det-dot { position: absolute; top: 9px; width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--panel); cursor: pointer; z-index: 2; }
+  .det-empty { padding: 16px; font-size: 13px; color: var(--muted); text-align: center; }
+
+  #g-tip { position: fixed; z-index: 50; max-width: 330px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); padding: 10px 12px; font-size: 12px; pointer-events: none; display: none; }
+  #g-tip .h { font-weight: 700; margin-bottom: 4px; }
+  #g-tip .s { color: var(--muted); margin-bottom: 6px; }
+  #g-tip .kv { display: grid; grid-template-columns: auto 1fr; gap: 1px 10px; }
+  #g-tip .kv .k { color: var(--muted); } #g-tip .kv .v { text-align: right; font-variant-numeric: tabular-nums; }
 
   .phase-h { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 16px 0 4px; font-weight: 700; }
   .agent { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin: 8px 0; }
@@ -203,10 +252,10 @@
   .feed-timeline { padding: 8px 14px 12px; position: relative; }
   .feed-timeline::before { content: ""; position: absolute; left: 20px; top: 8px; bottom: 12px; width: 2px; background: var(--line); }
   .feed-row { position: relative; padding: 5px 0 5px 28px; }
-  .feed-row::before { content: ""; position: absolute; left: 15px; top: 13px; width: 9px; height: 9px; border-radius: 50%; background: var(--line); border: 2px solid var(--panel); }
+  .feed-row::before { content: ""; position: absolute; left: 15px; top: 8px; width: 9px; height: 9px; border-radius: 50%; background: var(--line); border: 2px solid var(--panel); }
   .feed-row.running::before { background: var(--accent); }
   .feed-row.err::before { background: #ef4444; }
-  .feed-line { display: flex; align-items: center; gap: 7px; }
+  .feed-line { display: flex; align-items: baseline; gap: 7px; }
   .feed-t { font: 11px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted); min-width: 46px; }
   .feed-tool { font: 11px ui-monospace, monospace; font-weight: 700; padding: 1px 7px; border-radius: 6px; background: var(--bg); color: var(--ink); }
   .feed-arg { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted); word-break: break-all; }
@@ -1491,26 +1540,46 @@ $("#trace").addEventListener("click", e => {
 
 function fmtTok(n){ if(n==null) return "—"; if(n<1000) return ""+n; if(n<1e6) return (n/1000).toFixed(n<10000?1:0)+"k"; return (n/1e6).toFixed(2)+"M"; }
 function fmtDur(ms){ if(ms==null) return "—"; const s=Math.round(ms/1000); if(s<60) return s+"s"; const m=Math.floor(s/60), r=s%60; return r?`${m}м ${r}с`:`${m}м`; }
+// fmtDur c часами — для оси/тултипа таймлайна на длинных прогонах (fmtDur часы не умеет).
+function fmtDurH(ms){ if(ms==null) return "—"; let s=Math.round(ms/1000); const h=Math.floor(s/3600); s-=h*3600; const m=Math.floor(s/60); s-=m*60;
+  if(h) return m?`${h}ч ${m}м`:`${h}ч`; if(m) return s?`${m}м ${s}с`:`${m}м`; return s+"с"; }
 function fmtUsd(v){ if(v==null) return "—"; return "≈$"+(v<0.01?v.toFixed(4):v.toFixed(2)); }
 function fmtPct(v){ return v==null?"—":v+"%"; }
+function clock(ts){ const d=new Date(ts); return String(d.getUTCHours()).padStart(2,"0")+":"+String(d.getUTCMinutes()).padStart(2,"0"); }
+// «Красивый» шаг делений оси (~target тиков) — минуты/часы.
+function tickStepMs(spanMs, target){ const raw=spanMs/target; const c=[60e3,120e3,300e3,600e3,900e3,1800e3,3600e3,7200e3,14400e3]; for(const x of c) if(x>=raw) return x; return c[c.length-1]; }
+// Роль приходит с namespace-префиксом (ai-pathfinder:wf-coder) — нормализуем до ключа палитры (coder).
+function roleKey(r){ return (r||"").split(":").pop().replace(/^wf-/,""); }
+function roleLabel(r){ const k=roleKey(r); return k==="general-purpose"?"general":k; }
 const ROLE_COLORS = {
-  "wf-explorer":"#0ea5e9","wf-planner":"#8b5cf6","wf-coder":"#10b981","wf-reviewer":"#f59e0b",
-  "wf-documenter":"#ec4899","оркестратор":"#64748b",
-  "Explore":"#0ea5e9","Plan":"#8b5cf6","Code":"#10b981","Review":"#f59e0b"
+  explorer:"#0ea5e9", planner:"#8b5cf6", coder:"#10b981", reviewer:"#f59e0b",
+  documenter:"#ec4899", "оркестратор":"#64748b", Explore:"#06b6d4", "general-purpose":"#64748b"
 };
-function roleColor(r){ if(ROLE_COLORS[r]) return ROLE_COLORS[r];
-  let h=0; for(const c of (r||"")) h=(h*31+c.charCodeAt(0))%360; return `hsl(${h} 58% 46%)`; }
+function roleColor(r){ const k=roleKey(r); if(ROLE_COLORS[k]) return ROLE_COLORS[k];
+  let h=0; for(const c of k) h=(h*31+c.charCodeAt(0))%360; return `hsl(${h} 58% 46%)`; }
+// Метаданные фаз (фон-регионы). PHASE_NONE — легитимный бакет «вне фазы» (phase=null).
+const PHASE_NONE = "—";
+const PHASE_META = {
+  EXPLORE:   {label:"EXPLORE",   bg:"var(--ph-explore)",   line:"var(--ph-explore-line)"},
+  ELABORATE: {label:"ELABORATE", bg:"var(--ph-elaborate)", line:"var(--ph-elaborate-line)"},
+  IMPLEMENT: {label:"IMPLEMENT", bg:"var(--ph-implement)", line:"var(--ph-implement-line)"},
+  VERIFY:    {label:"VERIFY",    bg:"var(--ph-verify)",    line:"var(--ph-verify-line)"},
+  [PHASE_NONE]: {label:"вне фазы", bg:"var(--ph-none)",    line:"var(--ph-none-line)"},
+};
+const PHASE_ORDER = ["EXPLORE","ELABORATE","IMPLEMENT","VERIFY",PHASE_NONE];
 function ep(ts){ const v = Date.parse(ts||""); return isNaN(v)?null:v; }
 
-// Ensure #trace has stable child containers so the live feed (#trace-feed) is
-// never clobbered by the summary re-render. The feed is diff-rendered separately.
+// Ensure #trace has stable child containers so the live feed (#trace-feed) and the
+// interactive timeline (#trace-gantt) are never clobbered by the summary re-render.
+// The feed is diff-rendered separately; the gantt holds its own brush/tooltip state
+// outside #trace-summary, so the 4s summary tick can't reset the selected window.
 function ensureTraceShell(){
   let feed = $("#trace-feed");
   if(!feed){
-    $("#trace").innerHTML = `<div id="trace-feed"></div><div id="trace-summary"></div>`;
+    $("#trace").innerHTML = `<div id="trace-feed"></div><div id="trace-gantt"></div><div id="trace-summary"></div>`;
     feed = $("#trace-feed");
   }
-  return { feed, summary: $("#trace-summary") };
+  return { feed, gantt: $("#trace-gantt"), summary: $("#trace-summary") };
 }
 
 // renderTrace caches the latest /trace model, then diff-renders via renderTraceSummary().
@@ -1526,16 +1595,21 @@ function cardSession(spanId){
 }
 
 function renderTraceSummary(){
-  const { summary } = ensureTraceShell();
+  const { gantt, summary } = ensureTraceShell();
   const tr = lastTrace;
   const agents = tr.agents || [];
   if(!agents.length){
-    if(summary.dataset.empty !== "1"){ summary.innerHTML = `<p class="empty">Пока нет данных трейсинга — сводка появится, когда отработают сабагенты.</p>`; summary.dataset.empty = "1"; lastTraceSig = ""; }
+    if(summary.dataset.empty !== "1"){ summary.innerHTML = `<p class="empty">Пока нет данных трейсинга — сводка появится, когда отработают сабагенты.</p>`; summary.dataset.empty = "1"; gantt.innerHTML = ""; gantt.dataset.sig = ""; lastTraceSig = ""; }
     return;
   }
   const subs = agents.filter(a => a.kind === "subagent");
   const orch = agents.filter(a => a.kind === "orchestrator");
   const T = tr.totals || {};
+
+  // Таймлайн рендерится в стабильный контейнер вне #trace-summary, поэтому его
+  // brush-окно/тултип не сбрасываются 4-секундным тиком summary. Перерисовка — только
+  // по своей сигнатуре (смена набора/таймингов интервалов), не по каждому тику.
+  renderGantt(gantt, subs, tr);
 
   // Cheap signature: anything that changes the rendered summary must appear here, or a tick
   // would skip the DOM write (good — preserves open cards/scroll) while a click that toggles
@@ -1567,8 +1641,7 @@ function renderTraceSummary(){
       ${stat(fmtUsd(T.costUsd), "≈ стоимость")}
     </div>${byModel?`<div class="bymodel">${byModel}</div>`:""}`);
 
-  // --- timeline (gantt) ---
-  h += card("Таймлайн · параллелизм сабагентов", renderGantt(subs));
+  // --- timeline (gantt) renders into its own stable #trace-gantt container above (see renderGantt) ---
 
   // --- per-agent, grouped by phase, orchestrator first ---
   let body = "";
@@ -1644,34 +1717,263 @@ function cardMsgsBody(spanId){
 }
 function stat(v, k){ return `<div class="stat"><div class="v">${esc(String(v))}</div><div class="k">${esc(k)}</div></div>`; }
 
-function renderGantt(subs){
-  const items = subs.map(a => ({ a, s: ep(a.startTs), e: ep(a.endTs) }))
-                    .filter(x => x.s != null);
-  if(!items.length) return `<p class="empty">Нет завершённых интервалов.</p>`;
-  items.forEach(x => { if(x.e == null || x.e < x.s) x.e = x.s + 1000; });
-  const t0 = Math.min(...items.map(x => x.s)), t1 = Math.max(...items.map(x => x.e));
-  const span = Math.max(1, t1 - t0);
-  items.sort((a,b) => a.s - b.s);
-  // greedy lane packing -> parallel agents land on separate lanes
-  const laneEnds = [];
-  items.forEach(x => {
-    let li = laneEnds.findIndex(end => end <= x.s);
-    if(li < 0){ li = laneEnds.length; laneEnds.push(x.e); } else laneEnds[li] = x.e;
-    x.lane = li;
+// ----- Таймлайн «Трейсинг», Вариант C: токен-обзор + фазы + brush + детальная зона -----
+// Состояние brush (выбранное окно) и нормализованная модель держатся в МОДУЛЬНЫХ переменных
+// вне #trace-summary — поэтому 4-секундный тик не сбрасывает зум/наведение. Каркас перерисовывается
+// в стабильный host только при смене данных (по gSig); brush/детальная зона — отрисовкой по событиям.
+let gItems = [], gT0 = 0, gT1 = 0, gSpan = 1, gSkipped = 0, gPhases = [], gTokRate = [], gTokMax = 1, gNbuck = 240, gBw = 1;
+let gBs = 0, gBe = 0, gHasWin = false;   // выбранное окно brush (по умолчанию — весь прогон)
+let gGanttHost = null;
+
+// Главная точка: пересобрать модель из subs/tr, при смене данных — перестроить каркас, иначе перерисовать.
+function renderGantt(host, subs, tr){
+  gGanttHost = host;
+  bindGanttDeleg();   // делегированный hover/click на стабильном #trace-gantt — биндится один раз
+  const NOW = Date.now();
+  const tl = (tr && tr.timeline) || {};
+  // нормализация интервалов: только субагенты с известным startTs; span-/null → в сноску.
+  const items = []; let skipped = 0;
+  (subs || []).forEach(a => {
+    const s = ep(a.startTs); if(s == null){ skipped++; return; }
+    let e = ep(a.endTs); let running = false;
+    if(e == null){ e = NOW; running = true; }     // endTs нет, но есть start → идёт (бар до now)
+    if(e < s) e = s + 1000;
+    items.push({ a, s, e, running });
   });
+  items.sort((x,y) => x.s - y.s);
+  // границы — от серверных t0/t1 (учитывают окно), расширяем running до now и до фактических интервалов.
+  const srvT0 = (tl.t0 != null) ? tl.t0*1000 : Infinity;
+  const srvT1 = (tl.t1 != null) ? tl.t1*1000 : -Infinity;
+  const T0 = Math.min(srvT0, ...items.map(x => x.s));
+  const T1 = Math.max(srvT1, ...items.map(x => x.e), items.some(x=>x.running)?NOW:-Infinity);
+  const SPAN = Math.max(1, T1 - T0);
+
+  // --- токен-темп во времени (b13): out — итог за интервал, раздаём как rate = out/длительность ---
+  const NBUCK = 240, bw = SPAN/NBUCK;
+  const tokRate = new Array(NBUCK).fill(0);
+  items.forEach(x => {
+    const out = x.a.out; if(out == null || out <= 0) return;
+    const dur = Math.max(1, x.e - x.s);            // микро-интервал → токены в его бакет (без /0)
+    const rate = out / dur;
+    const b0 = Math.max(0, Math.floor((x.s - T0)/bw));
+    const b1 = Math.min(NBUCK-1, Math.floor((x.e - T0 - 1)/bw));
+    for(let b = b0; b <= b1; b++) tokRate[b] += rate;
+  });
+  const tokMax = Math.max(1e-9, ...tokRate);
+
+  // --- фазовые регионы (b14): диапазон фазы = [min start … max end] её интервалов; нахлёст допускаем ---
+  const pm = new Map();
+  items.forEach(x => { const p = x.a.phase || PHASE_NONE;
+    const r = pm.get(p) || { p, s: Infinity, e: -Infinity, n: 0, out: 0 };
+    r.s = Math.min(r.s, x.s); r.e = Math.max(r.e, x.e); r.n++; r.out += (x.a.out||0); pm.set(p, r); });
+  const phases = [...pm.values()].sort((a,b) => {
+    const ia = PHASE_ORDER.indexOf(a.p), ib = PHASE_ORDER.indexOf(b.p);
+    return (ia<0?99:ia)-(ib<0?99:ib);
+  });
+
+  // сигнатура каркаса: пересобираем DOM только при смене набора/таймингов (не на каждый тик),
+  // иначе brush-окно и наведение сохраняются. running-бары двигают T1 → попадают в сигнатуру.
+  const sig = items.map(x => (x.a.spanId||"")+":"+x.s+":"+x.e+":"+(x.a.ok===false?"x":"")+(x.running?"r":""))
+                .join("|") + "#" + T0 + "/" + T1 + "/" + skipped;
+
+  // публикуем модель в модульные переменные
+  gItems = items; gT0 = T0; gT1 = T1; gSpan = SPAN; gSkipped = skipped;
+  gPhases = phases; gTokRate = tokRate; gTokMax = tokMax; gNbuck = NBUCK; gBw = bw;
+
+  if(host.dataset.sig === sig){
+    // данные не менялись — каркас на месте; только подгоняем геометрию под текущую ширину
+    if(!gHasWin){ gBs = T0; gBe = T1; }
+    drawOverview(); drawDetail();
+    return;
+  }
+  host.dataset.sig = sig;
+  // окно: сохраняем выбранное, если оно ещё валидно внутри новых границ; иначе — весь прогон.
+  if(!gHasWin || gBs < T0 || gBe > T1 || gBe - gBs < 1){ gBs = T0; gBe = T1; gHasWin = false; }
+
+  if(!items.length){
+    host.innerHTML = card("Таймлайн · параллелизм сабагентов",
+      `<p class="empty">Нет интервалов с известным временем старта.${skipped?` (${skipped} запись без startTs скрыта)`:""}</p>`);
+    return;
+  }
+
+  // каркас (структура из mockups/v3.html, адаптирована к живому card())
+  host.innerHTML = card("Таймлайн · параллелизм сабагентов", `
+    <div class="legend g-legend" id="g-legend"></div>
+    <div class="legend ph g-legend" id="g-legend-ph"></div>
+    <p class="sub" id="g-ovsub"></p>
+    <div class="ov" id="g-ov">
+      <div class="ov-phases" id="g-ovphases"></div>
+      <svg class="ov-svg" id="g-ovsvg" preserveAspectRatio="none"></svg>
+      <div class="ov-brush" id="g-brush"></div>
+      <div class="ov-axis" id="g-ovaxis"></div>
+    </div>
+    <p class="ov-hint" id="g-ovhint"></p>
+    <div class="det-wrap"><div class="det-inner" id="g-det"></div></div>`);
+
+  bindBrush();
+  legendGantt();
+  drawOverview();
+  drawDetail();
+}
+
+// суммарные токены выбранного окна (Σ rate*bw по бакетам ≈ Σ out)
+function tokTotalWin(){
+  let sum = 0; const b0 = Math.max(0, Math.floor((gBs-gT0)/gBw)), b1 = Math.min(gNbuck-1, Math.floor((gBe-gT0)/gBw));
+  for(let b = b0; b <= b1; b++) sum += gTokRate[b]*gBw; return Math.round(sum);
+}
+
+function legendGantt(){
+  const leg = $("#g-legend", gGanttHost); if(!leg) return;
+  const roles = [...new Set(gItems.map(x => roleKey(x.a.role)))];
+  leg.innerHTML = `<span class="legtitle">роли</span>`+
+    roles.map(k => `<span class="lchip"><span class="ldot" style="background:${ROLE_COLORS[k]||roleColor(k)}"></span>${esc(k==="general-purpose"?"general":k)}</span>`).join("")+
+    `<span class="lchip"><span class="ldot run"></span>идёт</span>`+
+    `<span class="lchip"><span class="ldot err"></span>ошибка</span>`;
+  const legPh = $("#g-legend-ph", gGanttHost);
+  legPh.innerHTML = `<span class="legtitle">фазы (фон)</span>`+
+    gPhases.map(r => { const m = PHASE_META[r.p] || PHASE_META[PHASE_NONE];
+      return `<span class="lchip"><span class="lbar" style="background:${m.bg};border-color:${m.line}"></span>${esc(m.label)} · ${r.n}</span>`; }).join("");
+  const totOut = gItems.reduce((s,x) => s+(x.a.out||0), 0);
+  const maxN = gPhases.length ? Math.max(...gPhases.map(p => p.n)) : 0;
+  $("#g-ovsub", gGanttHost).textContent =
+    `Весь прогон: ${clock(gT0)}–${clock(gT1)} UTC · ${gItems.length} интервалов · до ${maxN} аг в крупнейшей фазе · ≈${fmtTok(totOut)} токенов`+
+    (gSkipped?` · ${gSkipped} запись без startTs скрыта`:``)+`.`;
+}
+
+function drawOverview(){
+  const host = gGanttHost; if(!host) return;
+  const svg = $("#g-ovsvg", host); if(!svg) return;
+  const W = svg.clientWidth || 1100, H = 78;
+  const px = t => (t-gT0)/gSpan*W;
+  // площадь по токен-темпу (по бакетам)
+  let path = `M0,${H} `;
+  for(let b = 0; b < gNbuck; b++){
+    const x0 = px(gT0+b*gBw), x1 = px(gT0+(b+1)*gBw);
+    const y = H-(gTokRate[b]/gTokMax)*(H-8);
+    path += `L${x0.toFixed(1)},${y.toFixed(1)} L${x1.toFixed(1)},${y.toFixed(1)} `;
+  }
+  path += `L${W},${H} Z`;
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.innerHTML = `<path d="${path}" fill="var(--accent)" fill-opacity="0.22" stroke="var(--accent)" stroke-width="1.1" stroke-opacity="0.7"/>`;
+  // фазовые полосы сверху обзора — greedy-пакинг в под-строки при нахлёсте по времени.
+  const ovp = $("#g-ovphases", host); let ph = ""; const rowEnds = [];
+  gPhases.forEach(r => { const l = px(r.s), w = Math.max(2, px(r.e)-px(r.s)); const m = PHASE_META[r.p] || PHASE_META[PHASE_NONE];
+    let row = rowEnds.findIndex(e => e <= l-2); if(row < 0){ row = rowEnds.length; rowEnds.push(l+w); } else rowEnds[row] = l+w;
+    ph += `<div class="ov-phband" style="top:${row*16}px;left:${l}px;width:${w}px;background:${m.bg};border-left-color:${m.line}" title="${esc(m.label)}: ${r.n} аг · ${fmtTok(r.out)} ток">${esc(m.label)}</div>`; });
+  const phRows = Math.max(1, rowEnds.length); ovp.style.height = (phRows*16)+"px"; ovp.innerHTML = ph;
+  // ось обзора (абсолютное HH:MM UTC) с делениями
+  const step = tickStepMs(gSpan, 8); const ax = $("#g-ovaxis", host); let html = "";
+  for(let t = Math.ceil(gT0/step)*step; t <= gT1; t += step) html += `<span class="ov-tick" style="left:${px(t)}px">${clock(t)}</span>`;
+  ax.innerHTML = html;
+  // brush — под полосой фаз, поверх токен-svg
+  const b = $("#g-brush", host);
+  b.style.top = ovp.offsetHeight+"px"; b.style.height = H+"px";
+  b.style.left = px(gBs)+"px"; b.style.width = Math.max(6, px(gBe)-px(gBs))+"px";
+  $("#g-ovhint", host).innerHTML =
+    `Верх — <b>производство токенов во времени</b> (высота = токены/время, агрегированный темп: для каждого агента rate = out/длительность, суммарно по активным). `+
+    `Полосы сверху — <b>фазы workflow</b> (фон = фаза, не цвет бара). Тяните по полосе, чтобы выбрать окно (двойной клик — весь прогон). `+
+    `В окне ≈ <b>${fmtTok(tokTotalWin())}</b> токенов.`;
+}
+
+function drawDetail(){
+  const host = gGanttHost; if(!host) return;
+  const det = $("#g-det", host); if(!det) return;
+  const win = gItems.filter(x => x.e >= gBs && x.s <= gBe);
+  if(!win.length){ det.style.width = ""; det.innerHTML = `<div class="det-empty">В выбранном окне нет интервалов.</div>`; return; }
+  const w0 = gBs, w1 = gBe, wspan = Math.max(1, w1-w0);
+  const wrap = host.querySelector(".det-wrap");
+  const Wd = Math.max(640, (wrap ? wrap.clientWidth : 1100)-2);
+  det.style.width = Wd+"px";
+  const px = t => (Math.max(w0, Math.min(w1, t))-w0)/wspan*Wd;
+  // lane-packing внутри окна
+  const arr = win.slice().sort((a,b) => a.s-b.s); const laneEnds = [];
+  arr.forEach(x => { let li = laneEnds.findIndex(e => e <= x.s); if(li < 0){ li = laneEnds.length; laneEnds.push(x.e); } else laneEnds[li] = x.e; x.dl = li; });
+  // фоновые регионы фаз (за барами), клип по окну
+  let phbg = "";
+  gPhases.forEach(r => { const s = Math.max(w0, r.s), e = Math.min(w1, r.e); if(e <= s) return;
+    const l = px(s), w = px(e)-px(s); const m = PHASE_META[r.p] || PHASE_META[PHASE_NONE];
+    phbg += `<div class="det-phbg" style="left:${l}px;width:${w}px;background:${m.bg}"></div>`; });
+  // полоса-заголовки фаз сверху (greedy-пакинг при нахлёсте)
+  let phhdr = ""; const hdrEnds = [];
+  gPhases.forEach(r => { const s = Math.max(w0, r.s), e = Math.min(w1, r.e); if(e <= s) return;
+    const l = px(s), w = Math.max(2, px(e)-px(s)); const m = PHASE_META[r.p] || PHASE_META[PHASE_NONE];
+    let row = hdrEnds.findIndex(en => en <= l-2); if(row < 0){ row = hdrEnds.length; hdrEnds.push(l+w); } else hdrEnds[row] = l+w;
+    phhdr += `<div class="det-phband" style="top:${row*16}px;left:${l}px;width:${w}px;background:${m.bg};border-left-color:${m.line}">${esc(m.label)}</div>`; });
+  const hdrH = Math.max(1, hdrEnds.length)*16;
+  const step = tickStepMs(wspan, 7); let axis = "";
+  for(let t = Math.ceil(w0/step)*step; t <= w1; t += step) axis += `<span class="det-tick" style="left:${px(t)}px">${clock(t)}</span>`;
   let lanes = "";
   for(let li = 0; li < laneEnds.length; li++){
     let bars = "";
-    items.filter(x => x.lane === li).forEach(x => {
-      const left = 100*(x.s - t0)/span, w = Math.max(2, 100*(x.e - x.s)/span);
-      const c = roleColor(x.a.role);
-      const label = `${x.a.role}${x.a.workstream?" · "+x.a.workstream:""} · ${fmtDur(x.a.durationMs)}`;
-      bars += `<div class="bar ${x.a.ok===false?'err':''}" style="left:${left}%;width:${w}%;background:${c}" title="${esc(label)} · ${fmtTok(x.a.out)} ток">${esc(label)}</div>`;
+    arr.filter(x => x.dl === li).forEach(x => {
+      const a = x.a, c = roleColor(a.role); const l = px(x.s), w = px(x.e)-px(x.s);
+      const dur = fmtDurH(a.durationMs != null ? a.durationMs : (x.e-x.s));
+      // микро-интервал (<4px) → точка-маркер вместо нулевого бара (b6)
+      if(w < 4){ bars += `<div class="det-dot" data-span="${esc(a.spanId)}" style="left:${l}px;background:${c}"></div>`; return; }
+      bars += `<div class="det-bar ${a.ok===false?'err':''} ${x.running?'running':''}" data-span="${esc(a.spanId)}" style="left:${l}px;width:${w}px;background:${c}">`+
+        (w>60?`<span>${esc(roleLabel(a.role))}</span>`:``)+(w>36?`<span class="du">${esc(dur)}${x.running?' · идёт':''}</span>`:``)+`</div>`;
     });
-    lanes += `<div class="lane">${bars}</div>`;
+    lanes += `<div class="det-lane">${bars}</div>`;
   }
-  return `<div class="gantt">${lanes}</div>
-    <div class="axis"><span>0с</span><span>${fmtDur(t1 - t0)}</span></div>`;
+  det.innerHTML = `<div class="det-phases" style="height:${hdrH}px">${phhdr}</div><div class="det-axis">${axis}</div>`+
+    `<div style="position:relative">${phbg}<div class="det-lanes">${lanes}</div></div>`;
+}
+
+// drag-brush по обзору пишет окно gBs/gBe (модульные переменные вне DOM) и перерисовывает зоны.
+// window/document-листенеры биндятся один раз; dblclick — на текущий svg при каждой пересборке каркаса.
+let gBrushDragging = false, gBrushX0 = 0, gBrushBound = false;
+function gTAt(clientX){ const o = gGanttHost && $("#g-ovsvg", gGanttHost); if(!o) return gT0; const r = o.getBoundingClientRect(); const f = (clientX-r.left)/r.width; return gT0+Math.max(0,Math.min(1,f))*gSpan; }
+function bindBrush(){
+  const ov = $("#g-ovsvg", gGanttHost); if(!ov) return;
+  ov.addEventListener("dblclick", () => { gBs = gT0; gBe = gT1; gHasWin = false; drawOverview(); drawDetail(); });
+  if(gBrushBound) return; gBrushBound = true;   // глобальные листенеры — один раз, читают gGanttHost/g*
+  document.addEventListener("mousedown", e => {
+    const o = gGanttHost && $("#g-ovsvg", gGanttHost); if(!o || !o.contains(e.target)) return;
+    gBrushDragging = true; gBrushX0 = gTAt(e.clientX); gBs = gBrushX0; gBe = gBrushX0; gHasWin = true; drawOverview();
+  });
+  window.addEventListener("mousemove", e => { if(!gBrushDragging) return; const t = gTAt(e.clientX); gBs = Math.min(gBrushX0,t); gBe = Math.max(gBrushX0,t); drawOverview(); });
+  window.addEventListener("mouseup", () => { if(!gBrushDragging) return; gBrushDragging = false;
+    if(gBe-gBs < 60000){ gBs = gT0; gBe = gT1; gHasWin = false; drawOverview(); }    // слишком узко → весь прогон
+    drawDetail(); });
+  window.addEventListener("resize", () => { if(gGanttHost && gGanttHost.querySelector(".ov-svg")){ drawOverview(); drawDetail(); } });
+}
+
+// Тултип бара — отдельный position:fixed-узел в <body> (вне #trace-summary), его не трёт тик summary.
+function gTip(){ let t = document.getElementById("g-tip"); if(!t){ t = document.createElement("div"); t.id = "g-tip"; document.body.appendChild(t); } return t; }
+// hover + click по таймлайну делегируются на стабильный #trace-gantt — биндим один раз.
+let gGanttDelegBound = false;
+function bindGanttDeleg(){
+  if(gGanttDelegBound) return; gGanttDelegBound = true;
+  const root = $("#trace-gantt"); if(!root) return;
+  const tip = gTip();
+  const findItem = span => gItems.find(x => x.a.spanId === span);
+  root.addEventListener("mousemove", e => {
+    const el = e.target.closest(".det-bar[data-span], .det-dot[data-span]");
+    if(!el){ tip.style.display = "none"; return; }
+    const it = findItem(el.dataset.span); if(!it){ tip.style.display = "none"; return; }
+    const a = it.a;
+    tip.innerHTML = `<div class="h">${esc(roleLabel(a.role))}${a.ok===false?' · ⚠ ошибка':(it.running?' · идёт…':'')}</div>`+
+      `<div class="s">${esc(a.summary||"без описания")}</div><div class="kv">`+
+      `<span class="k">фаза</span><span class="v">${esc(a.phase||"вне фазы")}</span>`+
+      `<span class="k">старт</span><span class="v">${a.startTs?clock(ep(a.startTs))+" UTC":"—"}</span>`+
+      `<span class="k">длит.</span><span class="v">${fmtDurH(a.durationMs!=null?a.durationMs:(it.e-it.s))}</span>`+
+      `<span class="k">модель</span><span class="v">${esc(a.model||"—")}</span>`+
+      `<span class="k">токены</span><span class="v">${fmtTok(a.out)}</span>`+
+      `<span class="k">контекст</span><span class="v">${fmtPct(a.contextPct)}</span>`+
+      `<span class="k">≈ стоим.</span><span class="v">${fmtUsd(a.costUsd)}</span></div>`;
+    tip.style.display = "block";
+    let x = e.clientX+14, y = e.clientY+14;
+    if(x+340 > innerWidth) x = e.clientX-340; if(y+200 > innerHeight) y = e.clientY-200;
+    tip.style.left = Math.max(4,x)+"px"; tip.style.top = Math.max(4,y)+"px";
+  });
+  root.addEventListener("mouseleave", () => { tip.style.display = "none"; });
+  // клик по бару → скролл/подсветка карточки агента ниже по spanId (карточка несёт data-card-span)
+  root.addEventListener("click", e => {
+    const el = e.target.closest(".det-bar[data-span], .det-dot[data-span]"); if(!el) return;
+    const card = document.querySelector(`.agent[data-card-span="${cssesc(el.dataset.span)}"]`); if(!card) return;
+    card.scrollIntoView({ behavior:"smooth", block:"center" });
+    card.classList.add("flash"); setTimeout(() => card.classList.remove("flash"), 1100);  // снимаем по таймауту, sig не трогаем
+  });
 }
 
 function agentCard(a, window){
