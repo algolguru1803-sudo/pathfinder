@@ -55,7 +55,7 @@
 **Следствие:** чтобы добавить команду, достаточно положить `skills/<command>/SKILL.md` (+ опц.
 `agents/<name>.md`). Правки `plugin.json`/`marketplace.json` функционально **не нужны** — только
 косметика витрины (бамп `version`, `keywords`, `description`). Новые ассеты появляются после
-**переустановки/refresh** плагина (`/plugin install ai-pathfinder@algolguru`), а не «на лету» в уже
+**переустановки/refresh** плагина (`/plugin install ai-pathfinder@tiltcoding`), а не «на лету» в уже
 запущенной сессии.
 
 ## Паттерн «SKILL.md + reference-файлы» (высота изложения)

@@ -106,15 +106,15 @@ evals/            fixtures, scenarios, rubrics for measuring the workflow
 From GitHub (anyone):
 
 ```
-/plugin marketplace add algolguru1803-sudo/pathfinder
-/plugin install ai-pathfinder@algolguru
+/plugin marketplace add TiltCoding/pathfinder
+/plugin install ai-pathfinder@tiltcoding
 ```
 
 Or from a local checkout during development:
 
 ```
 /plugin marketplace add /path/to/pathfinder
-/plugin install ai-pathfinder@algolguru
+/plugin install ai-pathfinder@tiltcoding
 ```
 
 Then run `/feature <describe your task>` in any project. The plugin starts the companion server, opens a
