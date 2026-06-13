@@ -1,42 +1,57 @@
 # Область: Скиллы-оркестраторы и ростеры под-агентов
 
-> Как в этом плагине устроены команды-оркестраторы (`/feature`, `/new-product`) и их под-агенты:
-> регистрация конвенцией каталогов, паттерн «SKILL.md + reference-файлы», frontmatter агентов
-> (включая `model:`) и почему ростеры `wf-*` и `np-*` раздельны. Эта область раньше отсутствовала в
-> базе знаний — следующий агент не должен заново выводить устройство оркестраторов из кода
-> (флажок из `.workflow/tasks/new-product-workflow/exploration.md:160`).
+> Как в этом плагине устроены команды-оркестраторы (`/feature`, `/new-product`, `/improve`) и их
+> под-агенты: регистрация конвенцией каталогов, паттерн «SKILL.md + reference-файлы», frontmatter
+> агентов (включая `model:`) и почему ростеры `wf-*` и `np-*` раздельны. Эта область раньше
+> отсутствовала в базе знаний — следующий агент не должен заново выводить устройство оркестраторов из
+> кода (флажок из `.workflow/tasks/new-product-workflow/exploration.md:160`).
 
 ## Назначение
 
 Плагин ai-pathfinder реализует **slash-команды как скиллы-оркестраторы**. Главный агент (оркестратор)
 не пишет код сам — он исполняет машину стадий и спавнит специализированных под-агентов через Agent tool.
-Две команды:
+Три команды:
 
 - **`/feature`** — работа в **существующей** кодовой базе: EXPLORE кода → план → один проход IMPLEMENT
   (`skills/feature/SKILL.md:14`).
 - **`/new-product`** — **greenfield** с нуля: DISCOVER (элиситация + ресёрч) → PRD → план фаз →
   эволюционный build-loop (`skills/new-product/SKILL.md:15`). Сиблинг `/feature`; отличие — стартовая
   точка (пустой репозиторий vs существующий код).
+- **`/improve`** — **производитель** feature-прогонов (не редактор кода): рой аналитиков обследует
+  существующее приложение → консенсус голосующей панели → человек выбирает фичи → посев параллельных
+  `/feature`-прогонов в git-worktree (`skills/improve/SKILL.md:16`). Сиблинг `/feature`/`/new-product`;
+  отличие — **ничего не реализует сам**, а готовит и раздаёт задачи для `/feature` (см. секцию ниже).
 
 ## Ключевые файлы
 
-- `skills/feature/SKILL.md:1`, `skills/new-product/SKILL.md:1` — корни оркестраторов: frontmatter
-  (`name`, `description`) + тело (ментальная модель, таблица под-агентов, start/resume, operating rules,
-  телеметрия).
+- `skills/feature/SKILL.md:1`, `skills/new-product/SKILL.md:1`, `skills/improve/SKILL.md:1` — корни
+  оркестраторов: frontmatter (`name`, `description`) + тело (ментальная модель, таблица под-агентов,
+  start/resume, operating rules, телеметрия).
 - `skills/new-product/phases.md`, `skills/new-product/loop.md`,
   `skills/new-product/feedback-loop.md`, `skills/new-product/dashboard-guide.md`,
   `skills/new-product/state-schema.md`, `skills/new-product/knowledge-guide.md` — reference-файлы
   оркестратора `/new-product` (детали стадий, цикла, сервера, рендера, state, базы знаний). Список и
   семантика «читай по мере надобности» — `skills/new-product/SKILL.md:47`. Зеркало feature-набора в
   `skills/feature/`.
+- `skills/improve/phases.md:1`, `skills/improve/consensus.md:1`, `skills/improve/dashboard-guide.md:1`,
+  `skills/improve/state-schema.md:1`, `skills/improve/feedback-loop.md`, `skills/improve/parallel.md`,
+  `skills/improve/knowledge-guide.md` — reference-файлы `/improve`. Доменные новые: `phases.md` (машина
+  стадий INTAKE…DONE), `consensus.md` (рой → дедуп → vote-панель → детерминированная агрегация →
+  seed-and-handoff). Переносимые (копии из `skills/feature/` с точечной адаптацией): `feedback-loop.md`,
+  `parallel.md`, `knowledge-guide.md` — почти дословно; `state-schema.md` и `dashboard-guide.md` —
+  с добавленными секциями (improve-поля state, контракт `feat-K` SELECT GATE). Список «читай по
+  надобности» — `skills/improve/SKILL.md:50`.
 - `agents/np-thinker.md:1`, `agents/np-researcher.md:1`, `agents/np-coder.md`, `agents/np-judge.md` —
   ростер `np-*` для `/new-product` (с полем `model:`).
 - `agents/wf-explorer.md:1`, `agents/wf-planner.md:1`, `agents/wf-coder.md:1`,
-  `agents/wf-reviewer.md:1`, `agents/wf-documenter.md:1` — ростер `wf-*` для `/feature` (без `model:`).
-  `wf-reviewer`/`wf-documenter` переиспользуются `/new-product` как есть.
+  `agents/wf-reviewer.md:1`, `agents/wf-documenter.md:1`, `agents/wf-improver.md:1` — ростер `wf-*`
+  (без `model:`, дефолтная модель сессии). `wf-explorer/planner/coder/reviewer/documenter` —
+  для `/feature`; `wf-improver` — двухрежимный (scout/vote) аналитик для `/improve`.
+  `wf-reviewer`/`wf-documenter` переиспользуются `/new-product` и `/improve` как есть.
 - `.claude-plugin/plugin.json:1` — манифест плагина: **только метаданные**, никакого перечисления
   скиллов/агентов/команд.
-- `README.md:39` — раздел про `/new-product`; `README.md:42` — раздел «Layout» (канонические каталоги).
+- `README.md:39` — раздел про `/new-product`; раздел про `/improve` (рой/консенсус/выбор/fan-out);
+  раздел «Layout» (канонические каталоги, включая `skills/improve/` и `wf-improver`).
 
 ## Регистрация: конвенция каталогов (не перечисление в манифесте)
 
@@ -91,8 +106,11 @@
   читает сырьё» (`agents/np-thinker.md:5`, `agents/np-thinker.md:14`); у read-only ролей
   (`wf-reviewer`, `np-judge`) нет Write/Edit.
 - **`model:`** — модель под-агента (**только у ростера `np-*`**: `agents/np-thinker.md:4` = `fable`,
-  `agents/np-researcher.md:4` = `opus`). У ростера `wf-*` поля нет — `/feature` идёт на дефолтной
-  модели сессии. Значения — **алиасы** (`fable`/`opus`), не полные id.
+  `agents/np-researcher.md:4` = `opus`). У ростера `wf-*` поля нет — `/feature`/`/improve` идут на
+  дефолтной модели сессии. Значения — **алиасы** (`fable`/`opus`), не полные id. **Прямое следствие
+  инварианта «model глобальна для subagent_type»:** `wf-improver` обслуживает оба режима (scout/vote)
+  **одним** файлом без `model:` (`agents/wf-improver.md:4`) — две модели потребовали бы второго файла
+  (`wf-voter`); режим выбирается **промптом оркестратора**, не моделью.
 
 ## Инварианты
 
@@ -128,7 +146,18 @@
   `templates/dashboard.html`, общие `templates/artifacts/*` и `templates/knowledge/*` **не нужно**.
 - **Гейт-сигнал один на все стадии.** Кнопка `approve-plan` зашита в HTML; `/new-product` интерпретирует
   её **по текущей стадии** (PRD-GATE = «PRD утверждён», PLAN-GATE = «план фаз утверждён»). Это
-  сознательное решение «без правок сервера/HTML» (см. ADR-0007).
+  сознательное решение «без правок сервера/HTML» (см. ADR-0007). `/improve` трактует тот же сигнал на
+  своём единственном гейте как «**диспетчим выбранные фичи**» (`skills/improve/dashboard-guide.md:104`).
+- **Гейт `/improve`: обязательный порядок Submit → Approve.** `draft.json` **не** в `READABLE_FILES`
+  сервера, поэтому выбор виден оркестратору только **после** «Отправить». Если `approve-plan` пришёл без
+  свежего `submissions/<n>.json` — читать нечего, надо переспросить человека сделать Submit
+  (`skills/improve/dashboard-guide.md:99`). Дефолт «**нет ответа = Пропускаем**»: фича без `answer` не
+  диспетчится (`saveAnswer` игнорит пустой ввод). Оба — контракт скилла, прописаны в `summary` человеку.
+- **Посев `/feature`-задачи в worktree чувствителен к порядку.** Сеять `state.json` **после**
+  `worktree.py add` через **read-modify-write** (add пишет только `worktreePath`/`branch`/`updatedAt` —
+  «whole-write» затрёт их); `baseCommit` снимать **в worktree**, не в main; `checkpoint:"working"` (а не
+  `"awaiting-batch"`, иначе резюм зависнет на несуществующем submission); сессию запускать **внутри**
+  worktree, иначе атрибуция телеметрии уедет (`skills/improve/consensus.md:174`, `parallel.md`).
 
 ## Карта `/new-product`: стадии + build-loop
 
@@ -154,6 +183,48 @@ INTAKE → DISCOVER → PRD → PRD-GATE → PHASE-PLAN → PLAN-GATE → BUILD 
 гейт (план), один проход IMPLEMENT параллельными кодерами, без эволюционного цикла и без судьи
 (`skills/feature/SKILL.md:26`).
 
+## Карта `/improve`: рой → консенсус → выбор → диспетч
+
+Третья команда (`skills/improve/SKILL.md:16`). В отличие от `/feature`/`/new-product`, **она не пишет и
+не правит код** — это **производитель** feature-прогонов: обследует приложение, ранжирует идеи и **сеет**
+их как отдельные `/feature`-задачи в git-worktree. Стадии (`state.json.phase`, `skills/improve/SKILL.md:37`):
+
+```
+INTAKE → SCOUT → CONSENSUS → PROPOSE/SELECT GATE → DISPATCH → DONE
+```
+
+- **Один гейт = выбор фич** (`skills/improve/SKILL.md:38`, контракт — `skills/improve/dashboard-guide.md:77`).
+  Контраст по гейтам: у `/feature` **один** гейт = «утвердить **план**»; у `/new-product` — **два** гейта
+  (PRD + план фаз); у `/improve` — **один** гейт, но это «**выбрать фичи**» (что делать), а не «утвердить
+  план» (как делать). Всё остальное (рой, голосование, агрегация, посев) — автономно.
+- **SCOUT — рой по призмам.** Оркестратор спавнит **7 `wf-improver` в scout-режиме параллельно**, по
+  одной на призму: UX/продукт, производительность, надёжность, техдолг, DX, пробелы фич, доступность +
+  безопасность (`skills/improve/phases.md:27`). Каждый читает `INDEX.md` первым, ищет проблемы со своей
+  призмы и отдаёт кандидатов по схеме `### cand:` (`agents/wf-improver.md:38`). Сырьё → `scout/<prism>.md`.
+- **CONSENSUS — голосование + детерминированная агрегация.** Оркестратор консолидирует и **дедуплицирует**
+  кандидатов в `cand-1…cand-N` (`candidates.md`), затем спавнит **3 `wf-improver` в vote-режиме
+  параллельно**, каждый видит **весь** список и оценивает `impact/effort/risk/confidence` (0–3) + keep/drop
+  (`agents/wf-improver.md:60`). Дальше **оркестратор сам** (не LLM) считает балл по формуле
+  `score=(mean(impact)−w_e·mean(effort)−w_r·mean(risk))·mean(conf)/3` (дефолты `w=0.5`),
+  «согласие»=доля keep, сортирует, берёт **топ-K = 6–8** (`skills/improve/consensus.md:64`). Это
+  «панель судей», как у `/new-product` (ADR-0006/0007); подробнее — **ADR-0012**.
+- **SELECT GATE — контракт `feat-K`.** Каждое из топ-K = карточка `planBlocks[].id = feat-K` + вопрос
+  `questions[kind:"choice"].id = feat-K`, `options:["Делаем","Пропускаем"]` (`skills/improve/dashboard-guide.md:83`).
+  Человек: radio → **«Отправить»** (submit) → **«Утвердить план»** (`approve-plan`). **0 правок
+  сервера/HTML** — реюз контракта `questions[choice]`+`approve-plan` (ADR-0008); подробнее — **ADR-0013**.
+- **DISPATCH — seed-and-handoff.** На каждую фичу с ответом «Делаем»: уникальный slug →
+  `worktree.py add` → `baseCommit` в worktree → read-modify-write `state.json` в `EXPLORE`/`working` →
+  посев `brief.md`/`dashboard.json`/`index.html` → хаб подхватит автоматически → **человек** запускает
+  `/feature` внутри worktree (`skills/improve/consensus.md:110`). Из одной сессии нельзя автозапустить N
+  независимых Claude Code-сессий — оркестратор готовит почву, человек заходит. Механика worktree/симлинка/
+  хаба переиспользуется как есть (см. `areas/parallel-runs-hub.md`, ADR-0010).
+- **DONE.** Финальный `dashboard.json` (карточки запущенных фич + ссылки на их дашборды и `/hub`) +
+  `wf-documenter` дописывает базу знаний.
+
+**`/improve` как производитель.** Диспетчнутые `/feature`-прогоны — **отдельные трейсы** (свои slug, свои
+worktree), они видны в хабе `/hub`, а не в трейсе задачи `/improve` (`skills/improve/SKILL.md:137`). Сам
+`/improve` ничего не коммитит и не имеет стадии VERIFY/`reviews.json` (`skills/improve/dashboard-guide.md:117`).
+
 ## Как расширять
 
 - **Новая команда-оркестратор:** создать `skills/<command>/SKILL.md` (frontmatter + тело по образцу),
@@ -165,7 +236,11 @@ INTAKE → DISCOVER → PRD → PRD-GATE → PHASE-PLAN → PLAN-GATE → BUILD 
   `model: <alias>`. Помнить: модель глобальна для `subagent_type` — для другой модели нужен отдельный
   файл, а не реюз чужого агента.
 - **Реюз под-агента в новой команде:** ссылаться на существующий `subagent_type` из таблицы SKILL.md —
-  **только если** его модель и инструменты подходят как есть (так `/new-product` реюзит
+  **только если** его модель и инструменты подходят как есть (так `/new-product` и `/improve` реюзят
   `wf-reviewer`/`wf-documenter`).
+- **Один агент на несколько режимов (вместо нового файла на режим):** если режимы могут идти на **одной**
+  модели и с **одним** tool-set — заводи один файл и различай режим **промптом** оркестратора (так
+  `wf-improver` совмещает scout и vote, `agents/wf-improver.md:9`). Отдельный файл нужен только когда
+  режимам требуются **разные модели** (`model` глобальна для `subagent_type`) или несовместимые `tools`.
 
-_updated: 2026-06-12_
+_updated: 2026-06-13_

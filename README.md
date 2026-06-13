@@ -72,6 +72,49 @@ frontmatter) and reuses the workflow's reviewer/documenter:
 The thinker is deliberately kept on **fable** and fed only curated digests (never raw sources): all
 hand-offs go through the orchestrator, and sub-agents never spawn sub-agents.
 
+## `/improve` — discover improvements, then fan them out
+
+A third command, `/improve`, is the sibling that **doesn't write code at all** — it is a *producer* of
+`/feature` runs. Point it at an existing app and it surveys the codebase with a **swarm** of read-only
+analysts (each from its own prism: UX/product, performance, reliability, tech-debt, DX, functionality
+gaps, accessibility & security), reaches **consensus** with a voting panel, lets the human **pick which
+improvements to do** on the dashboard, and then **seeds each chosen feature as a parallel `/feature` run**
+in its own git worktree — reusing the same companion server, dashboard, telemetry, and the parallel-runs
+hub.
+
+Its stages are:
+
+`INTAKE → SCOUT → CONSENSUS → PROPOSE/SELECT GATE → DISPATCH → DONE`
+
+— resumable via the same `.workflow/tasks/<slug>/state.json`.
+
+**How consensus works.** SCOUT spawns **7 `wf-improver` scouts in parallel** (one per prism); each reads
+the knowledge base first and proposes improvement candidates with `path:line` evidence. The orchestrator
+**consolidates and dedups** them into a stable list, then CONSENSUS spawns **3 `wf-improver` voters in
+parallel** — each independently scores the whole list (impact/effort/risk/confidence on a 0–3 scale,
+keep/drop). The orchestrator then **aggregates the votes deterministically** (not via an LLM:
+`score = (mean(impact) − w·mean(effort) − w·mean(risk)) · mean(confidence)/3`, agreement = share of keeps),
+ranks, and takes the **top 6–8** into the gate. This is the same "panel of independent scorers + a
+deterministic merge by the orchestrator" pattern as `/new-product`'s judge loop — sub-agents never spawn
+sub-agents, so the consensus is manufactured by the orchestrator, not by one agent.
+
+**The one gate: pick which features to do.** Unlike `/feature` (gate = *approve the plan*) and
+`/new-product` (two gates: PRD then phase-plan), `/improve` has a single gate where the human **picks
+which candidate features to dispatch**. It reuses the dashboard's existing `choice` questions + the
+«Утвердить план» signal with **zero edits to the server or HTML**: each top-K candidate is one card + one
+«Делаем/Пропускаем» choice; the human submits, then approves; no answer means "skip".
+
+**Dispatch is seed-and-handoff.** You can't auto-launch independent Claude Code sessions, so DISPATCH
+prepares the soil: for each picked feature it creates a git worktree (`scripts/worktree.py`), seeds a
+ready-to-resume `/feature` `state.json` (at EXPLORE) + brief + dashboard, and the run shows up in the
+**hub** (`/hub`). The human then `cd`s into each worktree and runs `/feature` there — it resumes straight
+into exploring, skipping intake.
+
+**How it differs from `/feature` and `/new-product`:** `/feature` implements one already-defined task;
+`/new-product` builds a greenfield product from a PRD; `/improve` **discovers what's worth doing** across
+the whole app and **dispatches the winners** as `/feature` runs — it never edits code itself. It runs a
+single two-mode `wf-improver` sub-agent (scout + vote) and reuses the workflow's `wf-documenter`.
+
 **The evolutionary build-loop (in brief).** Each BUILD phase runs a loop: `np-coder` first materializes
 **executable tests** from the thinker's spec (without seeing the implementation plan), and those tests
 are **frozen** (paths + hashes in state). Then each iteration: implement → run the frozen tests →
@@ -95,7 +138,8 @@ orchestrator interprets it by the current stage (PRD approved vs. phase-plan app
 hooks/hooks.json  telemetry hooks wiring
 skills/feature/   the /feature orchestrator skill + reference files
 skills/new-product/  the /new-product orchestrator skill + reference files
-agents/           wf-explorer, wf-planner, wf-coder, wf-reviewer, wf-documenter, np-* (thinker, researcher, coder, judge)
+skills/improve/   the /improve orchestrator skill + reference files (swarm → consensus → feature fan-out)
+agents/           wf-explorer, wf-planner, wf-coder, wf-reviewer, wf-documenter, wf-improver, np-* (thinker, researcher, coder, judge)
 scripts/          server.py (feedback server) + telemetry_hook.py + _aipf.py (shared, stdlib)
 templates/        dashboard.html + Russian artifact & knowledge-base templates
 evals/            fixtures, scenarios, rubrics for measuring the workflow

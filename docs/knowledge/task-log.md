@@ -4,6 +4,49 @@
 
 <!-- Новые записи — сверху. -->
 
+## 2026-06-13 — improve-workflow
+- **Что:** Добавлена третья команда-оркестратор **`/improve`** — производитель feature-прогонов (не
+  редактор кода). Стадии `INTAKE → SCOUT → CONSENSUS → PROPOSE/SELECT GATE → DISPATCH → DONE`: рой
+  аналитиков обследует приложение → консенсус голосующей панели → человек выбирает фичи → посев
+  параллельных `/feature`-прогонов в git-worktree (seed-and-handoff).
+  - **Скилл `skills/improve/`** (ws1): `SKILL.md` (frontmatter с `description`, разведённым от
+    `/feature`/`/new-product`; mental model; таблица под-агентов; start/resume; operating rules;
+    телеметрия), доменные `phases.md` (машина стадий) и `consensus.md` (рой → дедуп → vote-панель →
+    детерминированная агрегация → seed-and-handoff). Переносимые копии из `skills/feature/`:
+    `feedback-loop.md`/`parallel.md`/`knowledge-guide.md` — почти дословно; `state-schema.md`
+    (+секция «improve-specific fields») и `dashboard-guide.md` (+секция «SELECT GATE — контракт `feat-K`»).
+  - **Под-агент `agents/wf-improver.md`** (ws2): read-only (`tools: Read, Grep, Glob, Bash`, без `model:`),
+    **два режима** scout/vote, различаемые **промптом** оркестратора. SCOUT — кандидаты по призме (схема
+    `### cand:`); VOTE — независимая оценка всего списка 0–3 (`### cand-K`). Один файл на два режима —
+    следствие «model глобальна для subagent_type».
+  - **SELECT GATE + DISPATCH** (ws3): выбор фич через контракт `feat-K` (карточка `planBlocks` ↔
+    `questions[choice]` с тем же id, `options:["Делаем","Пропускаем"]`) + сигнал `approve-plan`, **0 правок
+    `server.py`/`dashboard.html`**; DISPATCH реюзит `scripts/worktree.py` и хаб (`/hub`) без правок.
+    (Тест `tests/test_improve_dispatch.py`, eval-кейс, рубрика `evals/rubrics/improve-quality.md` и бамп
+    `plugin.json` 0.11.0 → **0.12.0** пишет поток ws3 — задокументировано здесь по плану b6.)
+- **Зачем:** третий сценарий плагина — превратить «надо что-то улучшить» в приоритизированный,
+  выбранный человеком набор feature-задач. «Консенсус роя» реализован честно: независимые голоса панели +
+  детерминированная агрегация оркестратором (субагенты не спавнят субагентов; один LLM-агрегатор был бы
+  невозможен и нечестен). Главный гейт — поверх существующего контракта (0 правок сервера/HTML). Реальный
+  автозапуск N независимых Claude Code-сессий недоступен → seed-and-handoff: оркестратор готовит почву,
+  человек заходит в каждый worktree и запускает `/feature`.
+- **Ключевые решения:**
+  - **Механика консенсуса** — рой 7 scout по призмам → консолидация+дедуп оркестратором (`cand-1…N`) →
+    панель 3 vote → детерминированная агрегация (`score=(mean(imp)−w_e·mean(eff)−w_r·mean(rsk))·mean(conf)/3`,
+    дефолты `w=0.5`, «согласие»=доля keep, топ-K 6–8). Почему панель + арифметика оркестратора, а не
+    «консенсус в одном агенте» — **ADR-0012** (расширяет паттерн судейской панели ADR-0006/0007).
+  - **Reuse-first выбор фич / 0 правок сервера** — контракт `feat-K` через `questions[choice]`+`approve-plan`,
+    дефолт «нет ответа=Пропускаем», обязательный порядок Submit→Approve (`draft.json` не READABLE).
+    Развилка A (0 правок, выбран) vs B (аддитивный чеклист в HTML, оставлен как апгрейд) — **ADR-0013**
+    (связь с ADR-0008).
+- **Утверждённые параметры (зафиксированы):** Вариант A для гейта (q1); 7 призм scout / 3 голосующих /
+  топ-K 6–8 (q2); посев в `EXPLORE`/`working` (q3); одна модель `wf-improver` на оба режима (q4); дефолт
+  «нет ответа = Пропускаем» (q5); лёгкая eval-фикстура (q6).
+- **План:** `.workflow/tasks/improve-workflow/plan.md`
+- **ADR:** `decisions/ADR-0012-improve-consensus-panel-deterministic-aggregation.md`,
+  `decisions/ADR-0013-improve-feature-pick-reuse-zero-server.md`
+- **Область:** `areas/orchestrator-skills.md` (расширена секцией про `/improve`)
+
 ## 2026-06-13 — rework-agent-timeline
 - **Что:** Переписан таймлайн параллелизма сабагентов на вкладке «Трейсинг» под **Вариант C** —
   целиком на клиенте, в `renderGantt(host, subs, tr)` (`templates/dashboard.html`), **без правок сервера**.

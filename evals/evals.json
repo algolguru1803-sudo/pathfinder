@@ -1,6 +1,6 @@
 {
   "skill_name": "feature",
-  "notes": "Workflow-level evals. Each case runs its skill (/feature or /new-product, per the prompt and the case's `skill` field) in headless mode (AIPF_EVAL=1) against a fixture project; case 3 is greenfield (/new-product). The with-workflow run has the plugin enabled; the baseline is vanilla Claude on the same prompt. Grade with rubrics/ + the fixture's own test suite.",
+  "notes": "Workflow-level evals. Each case runs its skill (/feature, /new-product, or /improve, per the prompt and the case's `skill` field) in headless mode (AIPF_EVAL=1) against a fixture project; case 3 is greenfield (/new-product); case 4 is /improve (swarm analysis -> consensus -> feature pick -> dispatch of parallel /feature runs). The with-workflow run has the plugin enabled; the baseline is vanilla Claude on the same prompt. Grade with rubrics/ + the fixture's own test suite. /improve with empty seed_submissions relies on the headless auto-approve selecting the top-K candidates (default in AIPF_EVAL=1) and seeding them without a human at the gate.",
   "evals": [
     {
       "id": 1,
@@ -44,6 +44,21 @@
         { "name": "judge_verdicts_logged", "kind": "script", "text": "В reviews.json есть записи kind=\"judge\" с id judge-<фаза>-i<итерация>." },
         { "name": "prd_quality", "kind": "llm", "text": "PRD соответствует rubrics/prd-quality.md: FR-ID, Given-When-Then на каждый FR, Assumptions и Non-goals явные, трассировка FR→тест→рубрика." },
         { "name": "judge_loop_quality", "kind": "llm", "text": "Цикл судьи соответствует rubrics/judge-loop-quality.md: вердикты обоснованы evidence, гибридный гейт соблюдён (фаза не закрыта на красных тестах), стоп-условия сработали, scratchpad — дистиллят, не сырые логи." }
+      ]
+    },
+    {
+      "id": 4,
+      "name": "py-service-improve-swarm",
+      "skill": "improve",
+      "fixture": "fixtures/py-service",
+      "prompt": "Проанализируй это приложение роем агентов с разных призм, отбери консенсусом голосующей панели лучшие улучшения и предложи их к выбору одним гейтом; затем засей выбранные как параллельные feature-прогоны в git-worktree. Параметры прогона (фиксированные счётчики headless): 7 призм scout, 3 голосующих, топ-6 в гейт.",
+      "seed_submissions": [],
+      "expected_output": "Пройдены стадии INTAKE→SCOUT→CONSENSUS→PROPOSE/SELECT GATE→DISPATCH: рой scout-агентов выдал кандидатов с разных призм, оркестратор дедуплицировал их в candidates.md (cand-1…cand-N), независимая vote-панель оценила весь список, детерминированная агрегация дала топ-K; в headless auto-approve выбрал топ-K без человека и засеял ≥1 параллельный feature-прогон (state.json phase:EXPLORE/checkpoint:working, по возможности worktree). Артефакты на русском.",
+      "assertions": [
+        { "name": "candidates_generated", "kind": "script", "text": "В .workflow/tasks/<slug>/ есть scout-артефакты (scout/<prism>.md) и candidates.md со списком кандидатов cand-K." },
+        { "name": "consensus_ranked", "kind": "script", "text": "В state.json есть candidates/votes и отобранный топ-K (selected), а в dashboard.json — карточки planBlocks feat-K + соответствующие choice-вопросы с тем же id." },
+        { "name": "dispatch_seeded", "kind": "script", "text": "Создан ≥1 каталог посеянной feature-задачи со state.json phase:\"EXPLORE\" и checkpoint:\"working\" (+ при возможности worktreePath/branch); записан dispatched[] в state.json исходной задачи." },
+        { "name": "improve_quality", "kind": "llm", "text": "Прогон соответствует rubrics/improve-quality.md: широта роя, честный консенсус (независимое голосование + детерминированная агрегация), дедуп кандидатов, обоснованность топ-K, корректность SELECT GATE-контракта (feat-K, дефолт «нет ответа=Пропускаем»), валидность посева DISPATCH." }
       ]
     }
   ]
